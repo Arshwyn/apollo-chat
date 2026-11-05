@@ -1,0 +1,23 @@
+# DATA_DIR and GATEWAY_SOCKET_DIR are bind-mounted at the SAME absolute path as on the host, so the
+# photo and transcript paths in a prompt resolve for the host-side runner. The socket is mounted as a
+# DIRECTORY (never the socket file) so the app reconnects after the gateway restarts.
+# APP_UID / APP_GID must match the owner of DATA_DIR/users on the host (see docs/DEPLOY.md).
+services:
+  apollo-chat:
+    build: .
+    image: apollo-chat:local
+    restart: unless-stopped
+    user: '${APP_UID:?set APP_UID}:${APP_GID:?set APP_GID}'
+    env_file: .env
+    ports:
+      - '${BIND_ADDR:-127.0.0.1}:${PORT:-8790}:${PORT:-8790}'
+    volumes:
+      - '${DATA_DIR:?set DATA_DIR}:${DATA_DIR}'
+      - '${GATEWAY_SOCKET_DIR:?set GATEWAY_SOCKET_DIR}:${GATEWAY_SOCKET_DIR}'
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true

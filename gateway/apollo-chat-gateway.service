@@ -1,0 +1,20 @@
+[Unit]
+Description=apollo-chat gateway (launches the coaching agent for the chat app)
+After=network.target
+
+[Service]
+# Run as the OS user that owns the Claude Code login and the agent memory.
+User=<service-user>
+Group=<shared-group>
+EnvironmentFile=/path/to/gateway.env
+ExecStart=/usr/bin/node /path/to/apollo-chat/gateway/gateway.mjs
+Restart=on-failure
+RestartSec=2
+# Socket and created directories stay group-accessible for the container user and closed to everyone else.
+UMask=0007
+NoNewPrivileges=yes
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
