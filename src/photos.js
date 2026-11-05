@@ -83,5 +83,15 @@ export function photoRoutes({ config }) {
         return { photoId: id };
       },
     ],
+    [
+      'DELETE',
+      '/api/photos/:id',
+      ({ user, params }) => {
+        // Drops an unsent photo the user removed before sending; unknown ids are a no-op 404.
+        const s = stagedFile(config.dataDir, user, params.id);
+        fs.rmSync(s.dir, { recursive: true, force: true });
+        return { ok: true };
+      },
+    ],
   ];
 }

@@ -157,3 +157,22 @@ test('request logs carry no content, ids in paths, or identity details', async (
     await t.close();
   }
 });
+
+test('the app shell is served to authenticated users only, with safe paths and types', async () => {
+  const t = await startApp();
+  try {
+    const index = await t.call('alice', 'GET', '/');
+    assert.equal(index.status, 200);
+    assert.match(index.headers.get('content-type'), /text\/html/);
+    assert.match(index.text, /<script type="module" src="\/js\/app.js">/);
+    assert.equal(index.text.includes('<script>'), false, 'no inline scripts under the CSP');
+    assert.match((await t.call('alice', 'GET', '/js/app.js')).headers.get('content-type'), /javascript/);
+    assert.match((await t.call('alice', 'GET', '/style.css')).headers.get('content-type'), /text\/css/);
+    assert.equal((await t.call(null, 'GET', '/style.css')).status, 401);
+    assert.equal((await t.call('alice', 'GET', '/..%2Fpackage.json')).status, 404);
+    assert.equal((await t.call('alice', 'GET', '/%2e%2e/package.json')).status, 404);
+    assert.equal((await t.call('alice', 'GET', '/js')).status, 404);
+  } finally {
+    await t.close();
+  }
+});

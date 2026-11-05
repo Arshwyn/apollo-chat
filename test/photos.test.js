@@ -104,3 +104,16 @@ test('claiming moves photos into the run dir and rejects foreign, bad or too man
     await t.close();
   }
 });
+
+test('an unsent photo can be removed by its owner only', async () => {
+  const t = await withPhotos();
+  try {
+    const id = (await t.call('alice', 'POST', '/api/photos', await jpeg())).json.photoId;
+    assert.equal((await t.call('bob', 'DELETE', `/api/photos/${id}`)).status, 400);
+    assert.equal((await t.call('alice', 'DELETE', `/api/photos/${id}`)).status, 200);
+    assert.equal((await t.call('alice', 'DELETE', `/api/photos/${id}`)).status, 400);
+    assert.equal(files(path.join(t.dataDir, 'users', 'alice', 'tmp')).length, 0);
+  } finally {
+    await t.close();
+  }
+});
