@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import sharp from 'sharp';
-import { RunManager, stripTrailer } from '../src/runs.js';
+import { RunManager, stripTrailer, blockedNote } from '../src/runs.js';
+import { blockCategory } from '../src/streamParser.js';
 import { StoreRegistry } from '../src/store.js';
 import { stagePhoto } from '../src/photos.js';
 import { sweepPhotos } from '../src/sweep.js';
@@ -420,4 +421,91 @@ test('validation: empty, oversized and unknown conversation', () => {
   } finally {
     t.done();
   }
+});
+
+test('a blocked call names only its category, never a path or reason', async () => {
+  const t = setup(async (req, { onLine }) => {
+    onLine(
+      JSON.stringify({
+        type: 'assistant',
+        message: {
+          content: [
+            { type: 'tool_use', id: 'tool-1', name: 'Read', input: { file_path: '/PATH-SENTINEL/x' } },
+          ],
+        },
+      }),
+    );
+    onLine(
+      JSON.stringify({
+        type: 'user',
+        message: {
+          content: [
+            {
+              type: 'tool_result',
+              tool_use_id: 'tool-1',
+              is_error: true,
+              content: [{ type: 'text', text: 'apollo-isolation: REASON-SENTINEL /PATH-SENTINEL/x' }],
+            },
+          ],
+        },
+      }),
+    );
+    onLine(
+      JSON.stringify({
+        type: 'assistant',
+        message: {
+          content: [
+            {
+              type: 'tool_use',
+              id: 'tool-2',
+              name: 'mcp__claude_ai_Onyx_-_Alice__get_user_settings',
+              input: {},
+            },
+          ],
+        },
+      }),
+    );
+    onLine(
+      JSON.stringify({
+        type: 'user',
+        message: {
+          content: [
+            {
+              type: 'tool_result',
+              tool_use_id: 'tool-2',
+              is_error: true,
+              content: 'apollo-isolation: denied',
+            },
+          ],
+        },
+      }),
+    );
+    onLine(delta('Here is what I can tell you.'));
+    onLine(result('Here is what I can tell you.'));
+    return ok();
+  });
+  try {
+    const conv = t.stores.forUser('alice').createConversation();
+    const h = t.runs.start({ user: 'alice', conversationId: conv.id, text: 'hi' });
+    const seen = collect(h);
+    await h.done;
+    const last = t.stores.forUser('alice').lastMessage(conv.id);
+    assert.equal(last.status, 'done');
+    assert.equal(
+      last.text,
+      'Here is what I can tell you.\n\nThat request was blocked (file access, connector access).',
+    );
+    assert.equal(JSON.stringify(seen).includes('SENTINEL'), false);
+  } finally {
+    t.done();
+  }
+});
+
+test('blockedNote falls back to the generic note and blockCategory is generic', () => {
+  assert.equal(blockedNote(new Set()), 'That request was blocked.');
+  assert.equal(blockedNote(new Set(['file access'])), 'That request was blocked (file access).');
+  assert.equal(blockCategory('Grep'), 'file access');
+  assert.equal(blockCategory('Bash'), 'command access');
+  assert.equal(blockCategory('mcp__claude_ai_Oura__x'), 'connector access');
+  assert.equal(blockCategory(undefined), 'tool access');
 });

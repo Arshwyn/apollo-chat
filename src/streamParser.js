@@ -18,6 +18,15 @@ export function toolLabel(name) {
   return 'working';
 }
 
+// Generic category for a blocked call, never a path or a tool input.
+export function blockCategory(toolName) {
+  if (typeof toolName !== 'string') return 'tool access';
+  if (toolName.startsWith('mcp__')) return 'connector access';
+  if (['Read', 'Write', 'Edit', 'Grep', 'Glob', 'NotebookEdit'].includes(toolName)) return 'file access';
+  if (['Bash', 'BashOutput', 'KillShell'].includes(toolName)) return 'command access';
+  return 'tool access';
+}
+
 function resultText(content) {
   if (typeof content === 'string') return content;
   if (Array.isArray(content))
@@ -27,6 +36,7 @@ function resultText(content) {
 
 export function createStreamParser() {
   const seenTools = new Set();
+  const toolNames = new Map();
   let hadText = false;
   return {
     push(line) {
@@ -38,6 +48,7 @@ export function createStreamParser() {
       }
       const out = [];
       const tool = (id, name) => {
+        if (id && typeof name === 'string') toolNames.set(id, name);
         if (id && seenTools.has(id)) return;
         if (id) seenTools.add(id);
         out.push({ kind: 'tool', name: toolLabel(name) });
@@ -57,7 +68,10 @@ export function createStreamParser() {
       } else if (o.type === 'user' && Array.isArray(o.message?.content)) {
         for (const c of o.message.content) {
           if (c.type === 'tool_result' && c.is_error && resultText(c.content).includes(BLOCK_MARK)) {
-            out.push({ kind: 'blocked' });
+            out.push({
+              kind: 'blocked',
+              category: toolNames.has(c.tool_use_id) ? blockCategory(toolNames.get(c.tool_use_id)) : null,
+            });
           }
         }
       } else if (o.type === 'result') {
