@@ -17,6 +17,12 @@ const HOUR = 3600 * 1000;
 const TRAILER = /^(mail|temp):.*$/i;
 export const BLOCKED_NOTE = 'That request was blocked.';
 
+// "That request was blocked (file access)." Categories are generic words, never paths.
+export function blockedNote(categories) {
+  const list = [...categories].filter(Boolean);
+  return list.length ? `That request was blocked (${list.join(', ')}).` : BLOCKED_NOTE;
+}
+
 // Apollo ends its replies with housekeeping lines (mail:, temp:). They are for the agent fleet, not
 // for the person chatting, so trailing ones are removed from what the app shows and stores.
 export function stripTrailer(text) {
@@ -161,6 +167,7 @@ export class RunManager {
       events,
       text: '',
       blocked: false,
+      blockedCategories: new Set(),
       cancelRequested: false,
       started: false,
       abort: new AbortController(),
@@ -197,8 +204,10 @@ export class RunManager {
                 state.text += ev.text;
                 state.events.emit('delta', { text: ev.text });
               } else if (ev.kind === 'tool') state.events.emit('tool', { name: ev.name });
-              else if (ev.kind === 'blocked') state.blocked = true;
-              else if (ev.kind === 'result') result = ev;
+              else if (ev.kind === 'blocked') {
+                state.blocked = true;
+                state.blockedCategories.add(ev.category);
+              } else if (ev.kind === 'result') result = ev;
             }
           },
         },
@@ -238,7 +247,7 @@ export class RunManager {
     let text = state.text;
     if (!text.trim() && res.result?.text) text = res.result.text;
     if (this.config.stripTrailerLines) text = stripTrailer(text);
-    if (state.blocked) text = (text ? text + '\n\n' : '') + BLOCKED_NOTE;
+    if (state.blocked) text = (text ? text + '\n\n' : '') + blockedNote(state.blockedCategories);
     const failed =
       Boolean(res.error) || !exit || exit.code !== 0 || exit.timedOut || res.result?.isError === true;
     const status = cancelled ? 'cancelled' : failed ? 'error' : 'done';
