@@ -23,7 +23,10 @@ const MAX_REQUEST_BYTES = 256 * 1024;
 const MAX_PHOTOS = 4;
 const RUN_KEYS = new Set(['user', 'prompt', 'run_id', 'photo_paths', 'check_dayfile']);
 
-const BASE_ALLOWED = ['Read', 'Write', 'Edit', 'Grep', 'Glob', 'Bash', 'WebSearch', 'WebFetch'];
+// Chat runs get no shell: file tools only (the host hook confines them to the user's own folders),
+// web lookups, and ToolSearch (needed to load connector tools).
+const BASE_ALLOWED = ['Read', 'Write', 'Edit', 'Grep', 'Glob', 'WebSearch', 'WebFetch', 'ToolSearch'];
+const NO_SHELL = ['Bash', 'BashOutput', 'KillShell'];
 // Connectors that are never available to a chat run. The host hook denies them as well.
 const NEVER = [
   'mcp__claude_ai_Gmail',
@@ -75,7 +78,7 @@ export function toolLists(users, user) {
   const own = users[user];
   const others = new Set(Object.values(users).flat());
   for (const t of own) others.delete(t);
-  return { allowed: [...BASE_ALLOWED, ...own], disallowed: [...NEVER, ...others] };
+  return { allowed: [...BASE_ALLOWED, ...own], disallowed: [...NO_SHELL, ...NEVER, ...others] };
 }
 
 function fail(reason) {
@@ -135,12 +138,13 @@ export function buildArgv(cfg, { user, runId, photos }) {
   return argv;
 }
 
-export function buildEnv(cfg, user, base = process.env) {
+export function buildEnv(cfg, user, runId, base = process.env) {
   const env = {
     PATH: base.PATH || '/usr/local/bin:/usr/bin:/bin',
     APOLLO_USER: user,
     APOLLO_CHAT_RUN: '1',
     APOLLO_CHAT_DATA: cfg.dataDir,
+    APOLLO_RUN_ID: runId,
   };
   if (base.HOME) env.HOME = base.HOME;
   if (base.LANG) env.LANG = base.LANG;
@@ -222,7 +226,7 @@ export function createGateway(cfg, { log = (o) => process.stdout.write(JSON.stri
     try {
       child = spawn(cfg.claudeBin, buildArgv(cfg, run), {
         cwd,
-        env: buildEnv(cfg, run.user),
+        env: buildEnv(cfg, run.user, run.runId),
         detached: true,
         stdio: ['pipe', 'pipe', 'pipe'],
       });
