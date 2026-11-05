@@ -1,0 +1,31 @@
+{
+  "name": "apollo-chat",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Private web chat for per-user coaching conversations, installable as a PWA",
+  "main": "src/index.js",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node src/index.js",
+    "gateway": "node gateway/gateway.mjs",
+    "test": "node scripts/run-tests.js",
+    "lint": "eslint . && prettier --check .",
+    "format": "prettier --write .",
+    "icons": "node scripts/make-icons.mjs"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.14.0",
+    "globals": "17.14.0",
+    "prettier": "3.9.10"
+  },
+  "dependencies": {
+    "better-sqlite3": "11.10.0",
+    "jose": "6.2.15",
+    "sharp": "0.35.5"
+  }
+}
