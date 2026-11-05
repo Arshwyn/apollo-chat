@@ -53,9 +53,66 @@ function setup(gatewayImpl, configExtra = {}, now = () => Date.now()) {
 
 function collect(handle) {
   const seen = [];
-  for (const n of ['delta', 'tool', 'done', 'error']) handle.events.on(n, (d) => seen.push([n, d]));
+  for (const n of ['delta', 'interim', 'tool', 'done', 'error'])
+    handle.events.on(n, (d) => seen.push([n, d]));
   return seen;
 }
+
+const textStart = () =>
+  JSON.stringify({
+    type: 'stream_event',
+    event: { type: 'content_block_start', content_block: { type: 'text' } },
+  });
+const toolStart = (id) =>
+  JSON.stringify({
+    type: 'stream_event',
+    event: { type: 'content_block_start', content_block: { type: 'tool_use', id, name: 'Read' } },
+  });
+
+async function savedReply(lines) {
+  const t = setup(async (_req, { onLine }) => {
+    for (const l of lines) onLine(l);
+    return ok();
+  });
+  try {
+    const conv = t.stores.forUser('alice').createConversation();
+    const h = t.runs.start({ user: 'alice', conversationId: conv.id, text: 'hi' });
+    const seen = collect(h);
+    await h.done;
+    const msgs = t.stores.forUser('alice').allMessages(conv.id);
+    const transcript = fs.readFileSync(
+      path.join(t.dataDir, 'users', 'alice', 'transcripts', `${conv.id}.txt`),
+      'utf8',
+    );
+    return { text: msgs.at(-1).text, seen, transcript };
+  } finally {
+    t.done();
+  }
+}
+
+test('interim narration before a tool call is not stored, shown as done text or exported', async () => {
+  const r = await savedReply([
+    textStart(),
+    delta('Writing the day file now.'),
+    toolStart('t1'),
+    textStart(),
+    delta('Final answer'),
+    result('Final answer'),
+  ]);
+  assert.equal(r.text, 'Final answer');
+  assert.equal(r.seen.at(-1)[1].text, 'Final answer');
+  assert.deepEqual(
+    r.seen.filter((s) => s[0] === 'interim'),
+    [['interim', { text: 'Writing the day file now.' }]],
+  );
+  assert.match(r.transcript, /apollo: Final answer/);
+  assert.doesNotMatch(r.transcript, /day file now/);
+});
+
+test('a run ending in a tool call falls back to the last narration, never an empty reply', async () => {
+  const r = await savedReply([textStart(), delta('Checking.'), toolStart('t1'), result('')]);
+  assert.equal(r.text, 'Checking.');
+});
 
 test('stripTrailer removes only trailing housekeeping lines', () => {
   assert.equal(stripTrailer('Answer\n\nmail: none\ntemp: clean\n'), 'Answer');

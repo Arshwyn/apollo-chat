@@ -38,6 +38,9 @@ export function createStreamParser() {
   const seenTools = new Set();
   const toolNames = new Map();
   let hadText = false;
+  // Text since the last tool call. A tool call turns it into interim narration (event `interim`), so
+  // the consumer keeps only the text that follows the last tool call as the final answer.
+  let current = '';
   return {
     push(line) {
       let o;
@@ -51,16 +54,21 @@ export function createStreamParser() {
         if (id && typeof name === 'string') toolNames.set(id, name);
         if (id && seenTools.has(id)) return;
         if (id) seenTools.add(id);
+        if (current.trim()) out.push({ kind: 'interim', text: current });
+        current = '';
+        hadText = false;
         out.push({ kind: 'tool', name: toolLabel(name) });
       };
       if (o.type === 'stream_event' && o.event) {
         const e = o.event;
         if (e.type === 'content_block_start' && e.content_block?.type === 'text' && hadText) {
+          current += '\n\n';
           out.push({ kind: 'delta', text: '\n\n' });
         } else if (e.type === 'content_block_start' && e.content_block?.type === 'tool_use') {
           tool(e.content_block.id, e.content_block.name);
         } else if (e.type === 'content_block_delta' && e.delta?.type === 'text_delta' && e.delta.text) {
           hadText = true;
+          current += e.delta.text;
           out.push({ kind: 'delta', text: e.delta.text });
         }
       } else if (o.type === 'assistant' && Array.isArray(o.message?.content)) {
