@@ -182,6 +182,7 @@ export class RunManager {
   async #attempt(state, prompt) {
     const parser = createStreamParser();
     state.text = '';
+    state.lastInterim = '';
     let result = null;
     if (state.abort.signal.aborted || state.cancelRequested)
       return { exit: null, result, error: new GatewayError('aborted') };
@@ -203,6 +204,11 @@ export class RunManager {
               if (ev.kind === 'delta') {
                 state.text += ev.text;
                 state.events.emit('delta', { text: ev.text });
+              } else if (ev.kind === 'interim') {
+                // Narration before a tool call: shown transiently, not part of the stored reply.
+                state.lastInterim = ev.text;
+                state.text = '';
+                state.events.emit('interim', { text: ev.text });
               } else if (ev.kind === 'tool') state.events.emit('tool', { name: ev.name });
               else if (ev.kind === 'blocked') {
                 state.blocked = true;
@@ -237,7 +243,9 @@ export class RunManager {
 
     let res = await this.#attempt(state, prompt);
     const failedNoText = (r) =>
-      state.text.trim() === '' && (r.error || r.exit?.code !== 0 || r.result?.isError);
+      state.text.trim() === '' &&
+      !state.lastInterim?.trim() &&
+      (r.error || r.exit?.code !== 0 || r.result?.isError);
     // A cold start can race the connectors; one automatic retry, never after a cancel.
     if (failedNoText(res) && !state.cancelRequested && !state.abort.signal.aborted)
       res = await this.#attempt(state, prompt);
@@ -245,6 +253,8 @@ export class RunManager {
     const exit = res.exit;
     const cancelled = state.cancelRequested || exit?.cancelled === true;
     let text = state.text;
+    // A run that ends in a tool call has no final block: fall back to the last narration.
+    if (!text.trim() && state.lastInterim?.trim()) text = state.lastInterim;
     if (!text.trim() && res.result?.text) text = res.result.text;
     if (this.config.stripTrailerLines) text = stripTrailer(text);
     if (state.blocked) text = (text ? text + '\n\n' : '') + blockedNote(state.blockedCategories);

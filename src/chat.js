@@ -14,7 +14,7 @@ function sse(res, runHandle) {
   const { events, userMessage, assistantMessage } = runHandle;
   send('start', { userMessage, assistantMessage });
   // A browser that goes away does not stop the run: the reply is saved and visible on reload.
-  for (const name of ['delta', 'tool', 'done', 'error']) events.on(name, (d) => send(name, d));
+  for (const name of ['delta', 'interim', 'tool', 'done', 'error']) events.on(name, (d) => send(name, d));
   events.once('end', () => res.end());
   res.on('close', () => events.removeAllListeners());
   return new Promise((resolve) => res.on('close', resolve));
