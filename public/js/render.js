@@ -24,6 +24,23 @@ export function renderBody(el, text) {
         ul.append(li);
       }
       el.append(ul);
+    } else if (block.type === 'heading') {
+      const h = document.createElement(`h${block.level}`);
+      inline(h, block.parts);
+      el.append(h);
+    } else if (block.type === 'table') {
+      const wrap = document.createElement('div');
+      wrap.className = 'table-wrap';
+      const table = document.createElement('table');
+      const thead = table.createTHead().insertRow();
+      for (const cell of block.header) inline(thead.appendChild(document.createElement('th')), cell);
+      const tbody = table.createTBody();
+      for (const row of block.rows) {
+        const tr = tbody.insertRow();
+        for (const cell of row) inline(tr.insertCell(), cell);
+      }
+      wrap.append(table);
+      el.append(wrap);
     } else {
       const p = document.createElement('p');
       block.lines.forEach((line, i) => {
