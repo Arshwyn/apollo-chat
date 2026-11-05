@@ -340,3 +340,5 @@ syncOnline();
     note('Could not load your chats.', 'err');
   }
 })();
+
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});
