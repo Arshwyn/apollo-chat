@@ -199,6 +199,12 @@ function handleStream(b) {
       b.text += data.text;
       renderBody(b.body, b.text);
       els.status.hidden = true;
+    } else if (event === 'interim') {
+      // Narration before a tool call: transient status only, the reply restarts after the last tool call.
+      b.text = '';
+      renderBody(b.body, '');
+      els.status.hidden = false;
+      els.status.textContent = String(data.text).trim().split('\n').pop().slice(0, 140);
     } else if (event === 'tool') {
       els.status.hidden = false;
       els.status.textContent = `Apollo is ${data.name === 'reading' || data.name === 'writing notes' || data.name === 'working' || data.name === 'searching the web' ? data.name : `checking ${data.name}`}...`;
