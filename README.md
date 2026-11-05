@@ -79,7 +79,8 @@ No analytics, telemetry, third-party scripts, fonts or external requests; a stri
 
 ## Design notes (why)
 
-- **The user binding is an environment variable, set by the gateway.** The host hook cannot tell two simultaneous runs apart through a single lock file, so the gateway sets `APOLLO_USER` (and `APOLLO_CHAT_RUN=1`, `APOLLO_CHAT_DATA`) per process and the hook enforces it for every tool call in that process. See `docs/HOOK.md`.
+- **The user binding is an environment variable, set by the gateway.** The host hook cannot tell two simultaneous runs apart through a single lock file, so the gateway sets `APOLLO_USER` (and `APOLLO_CHAT_RUN=1`, `APOLLO_CHAT_DATA`, `APOLLO_RUN_ID`) per process and the hook enforces it for every tool call in that process.
+- **Chat runs have no shell.** They get the file tools, web lookups and the user's own connectors; the hook allows file access only on canonical paths inside the user's own folders and denies anything not on its list. See `docs/HOOK.md`.
 - **Runs use `--no-session-persistence`.** Claude Code's session transcripts keep image data from tool results, so resuming a session would leave photo bytes on disk. Instead the app replays the last few text turns of the chat into each prompt.
 - **A fixed working directory per user** (`users/<user>/work`) keeps runs predictable, and the gateway, not the app, decides every flag, path and environment variable.
 - **The service worker never caches the API** so chats and photos never sit in a shared browser cache.
