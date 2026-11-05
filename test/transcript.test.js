@@ -83,6 +83,10 @@ test('prompt names exactly one user and never the other', () => {
     assert.match(p, /user: hi\n {2}\[photo analysed\]\napollo: hello/);
     assert.ok(p.endsWith('Message:\nwhat now?'));
     assert.match(p, /BEFORE replying/);
+    for (const f of ['persona.md', 'rules.md', 'MEMORY.md']) assert.ok(p.includes(`/path/to/memory/${f}`), f);
+    assert.match(p, /Mailbox handling .* is not available in chat runs: skip it/);
+    assert.match(p, /If a call is blocked, say so honestly/);
+    assert.match(p, /must not stop the reply/);
   }
   const bare = buildPrompt({ user: 'alice', memoryRoot: '/m', transcriptsDir: '/t', text: 'x' });
   assert.equal(bare.includes('Attached photos'), false);

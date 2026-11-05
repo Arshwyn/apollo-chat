@@ -1,14 +1,26 @@
 const MAX_TURN_CHARS = 4000;
+// Shared start-up files in the memory root. Keep in step with the host hook's APOLLO_SHARED_FILES.
+export const SHARED_FILES = ['persona.md', 'rules.md', 'MEMORY.md'];
 
 function clip(s) {
   return s.length > MAX_TURN_CHARS ? s.slice(0, MAX_TURN_CHARS) + ' [...]' : s;
 }
 
 // The prompt names exactly one user and that user's folders. The other user is never mentioned.
-export function buildPrompt({ user, memoryRoot, transcriptsDir, photoPaths = [], history = [], text }) {
+export function buildPrompt({
+  user,
+  memoryRoot,
+  transcriptsDir,
+  photoPaths = [],
+  history = [],
+  text,
+  sharedFiles = SHARED_FILES,
+}) {
   const parts = [
     `Chat message from the user \`${user}\`. This run is for exactly this user; their folder is \`${memoryRoot}/${user}/\`.`,
     '',
+    `Shared start-up files are readable (read only) at ${sharedFiles.map((f) => `\`${memoryRoot}/${f}\``).join(', ')}: read exactly those paths with the Read tool. Mailbox handling (inbox, archive, sending notes) is not available in chat runs: skip it and do not retry it.`,
+    'If a call is blocked, say so honestly and briefly in your reply, then carry on and answer with what you can; a blocked call must not stop the reply.',
     'This is the chat channel (a phone screen). Reply in plain text, no tables wider than a few columns.',
     "Free chat: when the message contains a durable fact (an injury, a preference, a correction to one of your estimates, a goal change), save a short dated note in that user's history folder before replying; profile changes are only proposed, never applied without approval.",
     `Earlier chat is stored as text transcripts in \`${transcriptsDir}/\`. Search them only if the user asks about something said earlier; never read any chat database. Day files stay the source of truth for analysis.`,
