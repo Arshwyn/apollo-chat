@@ -1,6 +1,9 @@
 // Proves the isolation hook keeps two users apart, including when both run at the same time.
 // APOLLO_HOOK_PATH selects the hook under test: `npm test` points it at the proposed hook in docs/host;
 // the host operator re-runs this with the installed hook path after installing it.
+//
+// Chat runs have no shell and a default-deny tool surface: file tools are allowed only on canonical
+// paths inside the user's own memory folder, transcripts folder or this run's photo folder.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -9,22 +12,39 @@ import { spawn, spawnSync } from 'node:child_process';
 import { tmpDir, rmDir } from '../helpers.js';
 
 const HOOK = process.env.APOLLO_HOOK_PATH;
-const haveTools = spawnSync('bash', ['-c', 'command -v jq'], { encoding: 'utf8' }).status === 0;
+const haveTools =
+  spawnSync('bash', ['-c', 'command -v jq && command -v realpath'], { encoding: 'utf8' }).status === 0;
 const skip = !HOOK
   ? 'APOLLO_HOOK_PATH is not set'
   : !fs.existsSync(HOOK)
     ? 'APOLLO_HOOK_PATH does not exist'
     : !haveTools
-      ? 'jq is not installed'
+      ? 'jq and realpath are required'
       : false;
 
+const RUN = 'run-12345678';
 const fx = {};
 if (!skip) {
   fx.dir = tmpDir('ac-hook-');
   fx.root = path.join(fx.dir, 'agent-memory', 'apollo');
   fx.data = path.join(fx.dir, 'chatdata');
-  for (const u of ['alice', 'bob']) fs.mkdirSync(path.join(fx.root, u, 'history'), { recursive: true });
-  fs.mkdirSync(fx.data, { recursive: true });
+  for (const u of ['alice', 'bob']) {
+    fs.mkdirSync(path.join(fx.root, u, 'history'), { recursive: true });
+    fs.mkdirSync(path.join(fx.data, 'users', u, 'transcripts'), { recursive: true });
+    fs.mkdirSync(path.join(fx.data, 'users', u, 'tmp', RUN), { recursive: true });
+    fs.mkdirSync(path.join(fx.data, 'users', u, 'tmp', 'run-other-000'), { recursive: true });
+  }
+  // Symlinks planted inside each user's own folders that point at the other user's folders.
+  for (const [me, other] of [
+    ['alice', 'bob'],
+    ['bob', 'alice'],
+  ]) {
+    fs.symlinkSync(path.join(fx.root, other), path.join(fx.root, me, 'link-to-other'));
+    fs.symlinkSync(
+      path.join(fx.data, 'users', other, 'transcripts'),
+      path.join(fx.data, 'users', me, 'transcripts', 'escape'),
+    );
+  }
   test.after(() => rmDir(fx.dir));
 }
 
@@ -40,86 +60,187 @@ const chatEnv = (user, extra = {}) => ({
   APOLLO_CHAT_RUN: '1',
   ...(user === undefined ? {} : { APOLLO_USER: user }),
   APOLLO_CHAT_DATA: fx.data,
+  APOLLO_RUN_ID: RUN,
   ...extra,
 });
 
-function call(env, tool, input, { agent = 'apollo' } = {}) {
+function callRaw(env, raw) {
   return new Promise((resolve, reject) => {
     const p = spawn('bash', [HOOK], { env, stdio: ['pipe', 'pipe', 'pipe'] });
     let out = '';
     p.stdout.on('data', (d) => (out += d));
+    p.stderr.on('data', () => {});
     p.on('error', reject);
     p.on('close', () => {
       if (!out.trim()) return resolve({ decision: 'allow' });
       const o = JSON.parse(out).hookSpecificOutput;
       resolve({ decision: o.permissionDecision, reason: o.permissionDecisionReason });
     });
-    p.stdin.end(
-      JSON.stringify({
-        hook_event_name: 'PreToolUse',
-        tool_name: tool,
-        tool_input: input,
-        agent_type: agent,
-      }),
-    );
+    p.stdin.on('error', () => {});
+    p.stdin.end(raw);
   });
 }
+const call = (env, tool, input, { agent = 'apollo' } = {}) =>
+  callRaw(
+    env,
+    JSON.stringify({ hook_event_name: 'PreToolUse', tool_name: tool, tool_input: input, agent_type: agent }),
+  );
 
 const p = (...parts) => path.join(...parts);
+const cap = (s) => s[0].toUpperCase() + s.slice(1);
 const mem = (u, f = 'profile.md') => p(fx.root, u, f);
 const tr = (u, f = 'a.txt') => p(fx.data, 'users', u, 'transcripts', f);
-const photo = (u) => p(fx.data, 'users', u, 'tmp', 'run-12345678', 'a.jpg');
+const photo = (u, run = RUN) => p(fx.data, 'users', u, 'tmp', run, 'a.jpg');
 
-// [tool, input] pairs for a chat run as `me` against `other`.
 const allowedFor = (me) => [
-  ['Read', { file_path: mem(me) }],
-  ['Write', { file_path: mem(me, 'history/2026/11/05/analysis.md'), content: 'notes' }],
-  ['Read', { file_path: tr(me) }],
-  ['Grep', { pattern: 'knee', path: p(fx.data, 'users', me, 'transcripts') }],
-  ['Read', { file_path: photo(me) }],
-  ['Bash', { command: `grep -ri knee ${p(fx.data, 'users', me, 'transcripts')}/` }],
-  ['mcp__claude_ai_Onyx_-_' + me[0].toUpperCase() + me.slice(1) + '__get_user_settings', {}],
-  ['WebSearch', { query: 'protein sources' }],
-];
-const deniedFor = (me, other) => [
-  ['Read', { file_path: mem(other) }],
-  ['Read', { file_path: p(fx.root, `${other}-profile.md`) }],
-  ['Read', { file_path: tr(other) }],
-  ['Read', { file_path: photo(other) }],
-  ['Bash', { command: `cat ${p(fx.data, 'users', other, 'chat.db')}` }],
-  ['Read', { file_path: p(fx.data, 'users', me, 'chat.db') }],
-  ['Read', { file_path: p(fx.data, 'users', me, 'work', 'x') }],
-  ['Grep', { pattern: 'x', path: p(fx.data, 'users') }],
-  ['Grep', { pattern: 'x', path: fx.data }],
-  ['Bash', { command: `ls ${fx.data}` }],
-  ['Glob', { pattern: p(fx.data, 'users', '*', 'transcripts', '*') }],
-  ['Glob', { pattern: p(fx.root, '*', 'history', '*') }],
-  ['Read', { file_path: p(fx.data, 'users', me, 'transcripts', '..', '..', other, 'chat.db') }],
-  ['Bash', { command: 'cat ../../' + other + '/chat.db' }],
-  ['Bash', { command: 'ls ..' }],
-  ['Grep', { pattern: 'x', path: p(fx.root) }],
-  ['mcp__claude_ai_Onyx_-_' + other[0].toUpperCase() + other.slice(1) + '__get_user_settings', {}],
-  ['mcp__claude_ai_Gmail__search_threads', {}],
-  ['mcp__claude_ai_Google_Drive__search_files', {}],
-  ['Agent', { subagent_type: 'Explore', prompt: 'look around' }],
+  ['Read own memory', 'Read', { file_path: mem(me) }],
+  [
+    'Write new nested file in own memory',
+    'Write',
+    { file_path: mem(me, 'history/2026/11/05/new/analysis.md'), content: 'notes' },
+  ],
+  ['Edit own memory', 'Edit', { file_path: mem(me, 'history/x.md'), old_string: 'a', new_string: 'b' }],
+  ['Read own transcript', 'Read', { file_path: tr(me) }],
+  [
+    'Grep own transcripts',
+    'Grep',
+    { pattern: 'knee', path: p(fx.data, 'users', me, 'transcripts'), glob: '*.txt' },
+  ],
+  ['Grep own memory', 'Grep', { pattern: 'Intake', path: mem(me, 'history') }],
+  ['Glob own memory', 'Glob', { pattern: 'history/**/*.md', path: p(fx.root, me) }],
+  ['Glob own transcripts', 'Glob', { pattern: '*.txt', path: p(fx.data, 'users', me, 'transcripts') }],
+  ['Read this run photo', 'Read', { file_path: photo(me) }],
+  ['own Onyx connector', 'mcp__claude_ai_Onyx_-_' + cap(me) + '__get_user_settings', {}],
+  ['WebSearch', 'WebSearch', { query: 'protein sources' }],
+  ['ToolSearch', 'ToolSearch', { query: 'select:something' }],
 ];
 
-test('chat run: each user may use their own data and is denied the other users', { skip }, async () => {
+const deniedFor = (me, other) => {
+  const mine = p(fx.root, me);
+  const wide = [
+    fx.root,
+    path.dirname(fx.root),
+    path.dirname(path.dirname(fx.root)),
+    fx.data,
+    p(fx.data, 'users'),
+  ];
+  return [
+    // no shell at all
+    ['Bash ls', 'Bash', { command: 'ls' }],
+    ['Bash own file', 'Bash', { command: `cat ${mem(me)}` }],
+    ['Bash find over the parent', 'Bash', { command: `find ${path.dirname(fx.root)} -name '*'` }],
+    ['Bash with quoting and variables', 'Bash', { command: `d=${fx.root}; cat "$d"/'${other}'/profile.md` }],
+    ['BashOutput', 'BashOutput', { bash_id: '1' }],
+    // the other user's data, literally
+    ['Read other memory', 'Read', { file_path: mem(other) }],
+    ['Read other transcript', 'Read', { file_path: tr(other) }],
+    ['Read other photo', 'Read', { file_path: photo(other) }],
+    ['Write other memory', 'Write', { file_path: mem(other, 'x.md'), content: 'x' }],
+    ['Edit other memory', 'Edit', { file_path: mem(other), old_string: 'a', new_string: 'b' }],
+    // own folders that are not allowed
+    ['Read own chat db', 'Read', { file_path: p(fx.data, 'users', me, 'chat.db') }],
+    ['Read own work dir', 'Read', { file_path: p(fx.data, 'users', me, 'work', 'x') }],
+    ['Read another run photo dir of mine', 'Read', { file_path: photo(me, 'run-other-000') }],
+    ['Write into own transcripts', 'Write', { file_path: tr(me, 'new.txt'), content: 'x' }],
+    ['Write into own photo dir', 'Write', { file_path: photo(me), content: 'x' }],
+    ['Write own chat db', 'Write', { file_path: p(fx.data, 'users', me, 'chat.db'), content: 'x' }],
+    // wildcards in the user segment or above it
+    ...['*', '?ob', '[b]ob', '{alice,bob}', '[a-z]*'].flatMap((seg) => [
+      [`Read wildcard user segment ${seg}`, 'Read', { file_path: p(fx.root, seg, 'profile.md') }],
+      [`Grep wildcard user segment ${seg}`, 'Grep', { pattern: 'x', path: p(fx.root, seg) }],
+      [`Glob wildcard user segment ${seg}`, 'Glob', { pattern: '*', path: p(fx.root, seg) }],
+    ]),
+    [
+      'Glob wildcard in the data users segment',
+      'Glob',
+      { pattern: '*', path: p(fx.data, 'users', '*', 'transcripts') },
+    ],
+    // parent directories and the roots themselves
+    ...wide.flatMap((d) => [
+      [`Grep path ${path.basename(d)}`, 'Grep', { pattern: 'x', path: d }],
+      [`Glob path ${path.basename(d)}`, 'Glob', { pattern: '*', path: d }],
+      [`Read path ${path.basename(d)}`, 'Read', { file_path: d }],
+    ]),
+    ['Glob pattern into the other user from the parent', 'Glob', { pattern: `${other}/**`, path: fx.root }],
+    // relative paths
+    ['Read relative other', 'Read', { file_path: `${other}/profile.md` }],
+    ['Read relative dot', 'Read', { file_path: './profile.md' }],
+    ['Read bare name', 'Read', { file_path: 'profile.md' }],
+    ['Grep relative dot', 'Grep', { pattern: 'x', path: '.' }],
+    ['Glob relative path', 'Glob', { pattern: '*', path: 'history' }],
+    ['Write relative', 'Write', { file_path: 'x.md', content: 'x' }],
+    // symlinks planted inside the user's own folders
+    ['Read through a memory symlink', 'Read', { file_path: p(mine, 'link-to-other', 'profile.md') }],
+    ['Grep through a memory symlink', 'Grep', { pattern: 'x', path: p(mine, 'link-to-other') }],
+    ['Glob through a memory symlink', 'Glob', { pattern: '*', path: p(mine, 'link-to-other') }],
+    [
+      'Write through a memory symlink',
+      'Write',
+      { file_path: p(mine, 'link-to-other', 'x.md'), content: 'x' },
+    ],
+    ['Read through a transcripts symlink', 'Read', { file_path: tr(me, 'escape/a.txt') }],
+    ['Grep through a transcripts symlink', 'Grep', { pattern: 'x', path: tr(me, 'escape') }],
+    // parent hops and sibling-prefix names
+    ['Read with parent hop', 'Read', { file_path: p(mine, '..', other, 'profile.md') }],
+    [
+      'Grep with parent hop',
+      'Grep',
+      { pattern: 'x', path: p(fx.data, 'users', me, 'transcripts', '..', '..', other, 'transcripts') },
+    ],
+    ['Write with parent hop', 'Write', { file_path: `${mine}/../${other}/x.md`, content: 'x' }],
+    ['Read sibling prefix of memory folder', 'Read', { file_path: `${mine}-evil/x` }],
+    [
+      'Read sibling prefix of transcripts folder',
+      'Read',
+      { file_path: `${p(fx.data, 'users', me, 'transcripts')}-evil/x` },
+    ],
+    // missing or wrongly typed arguments
+    ['Grep without path', 'Grep', { pattern: 'x' }],
+    ['Glob without path', 'Glob', { pattern: '*.md' }],
+    ['Glob without pattern', 'Glob', { path: mine }],
+    ['Read without file_path', 'Read', {}],
+    ['Write without file_path', 'Write', { content: 'x' }],
+    ['Read non-string path', 'Read', { file_path: 123 }],
+    ['Grep non-string path', 'Grep', { pattern: 'x', path: ['/a'] }],
+    ['Read null path', 'Read', { file_path: null }],
+    ['Read with control character path', 'Read', { file_path: `${mine}/a\nb` }],
+    // patterns
+    ['Glob pattern starting with **', 'Glob', { pattern: `**/${other}/**`, path: mine }],
+    ['Glob pattern starting with /', 'Glob', { pattern: `${fx.root}/*/profile.md`, path: mine }],
+    ['Glob pattern with parent hop', 'Glob', { pattern: `../${other}/*`, path: mine }],
+    ['Glob pattern with home', 'Glob', { pattern: '~/x', path: mine }],
+    ['Grep glob filter with parent hop', 'Grep', { pattern: 'x', path: mine, glob: `../${other}/*` }],
+    ['Grep glob filter absolute', 'Grep', { pattern: 'x', path: mine, glob: '/etc/*' }],
+    // connectors
+    ['other Onyx connector', 'mcp__claude_ai_Onyx_-_' + cap(other) + '__get_user_settings', {}],
+    ['Gmail', 'mcp__claude_ai_Gmail__search_threads', {}],
+    ['Drive', 'mcp__claude_ai_Google_Drive__search_files', {}],
+    // tools not on the list
+    ['Agent', 'Agent', { subagent_type: 'Explore', prompt: 'look around' }],
+    ['Task', 'Task', { prompt: 'x' }],
+    ['Skill', 'Skill', { skill: 'x' }],
+    ['NotebookEdit', 'NotebookEdit', { notebook_path: mem(me, 'n.ipynb') }],
+    ['TodoWrite', 'TodoWrite', { todos: [] }],
+  ];
+};
+
+test('chat run: each user may use their own data and tools', { skip }, async () => {
+  for (const me of ['alice', 'bob']) {
+    for (const [label, tool, input] of allowedFor(me)) {
+      const r = await call(chatEnv(me), tool, input);
+      assert.equal(r.decision, 'allow', `${me}: ${label} should be allowed (${r.reason})`);
+    }
+  }
+});
+
+test('chat run: every denied input class is denied for both users', { skip }, async () => {
   for (const [me, other] of [
     ['alice', 'bob'],
     ['bob', 'alice'],
   ]) {
-    for (const [tool, input] of allowedFor(me)) {
+    for (const [label, tool, input] of deniedFor(me, other)) {
       const r = await call(chatEnv(me), tool, input);
-      assert.equal(
-        r.decision,
-        'allow',
-        `${me} should be allowed ${tool} ${JSON.stringify(input)}: ${r.reason}`,
-      );
-    }
-    for (const [tool, input] of deniedFor(me, other)) {
-      const r = await call(chatEnv(me), tool, input);
-      assert.equal(r.decision, 'deny', `${me} should be denied ${tool} ${JSON.stringify(input)}`);
+      assert.equal(r.decision, 'deny', `${me}: ${label} should be denied`);
     }
   }
 });
@@ -137,16 +258,45 @@ test(
 );
 
 test('chat run: enforced for every agent type, not only apollo', { skip }, async () => {
-  const r = await call(chatEnv('alice'), 'Read', { file_path: mem('bob') }, { agent: 'Explore' });
-  assert.equal(r.decision, 'deny');
-  const none = await call(chatEnv('alice'), 'Read', { file_path: mem('bob') }, { agent: '' });
-  assert.equal(none.decision, 'deny');
+  for (const agent of ['Explore', '', 'apollo']) {
+    const r = await call(chatEnv('alice'), 'Read', { file_path: mem('bob') }, { agent });
+    assert.equal(r.decision, 'deny', `agent ${JSON.stringify(agent)}`);
+    const ok = await call(chatEnv('alice'), 'Read', { file_path: mem('alice') }, { agent });
+    assert.equal(ok.decision, 'allow', `own file, agent ${JSON.stringify(agent)}`);
+  }
 });
 
-test('chat run fails closed: missing or invalid user denies even harmless calls', { skip }, async () => {
+test('chat run fails closed: malformed or incomplete hook input is never allowed', { skip }, async () => {
+  const inputs = {
+    empty: '',
+    whitespace: '  \n ',
+    garbage: 'this is not json',
+    truncated: '{"tool_name":"Read","tool_input":{"file_path":"' + mem('alice'),
+    null: 'null',
+    array: '[]',
+    string: '"Read"',
+    number: '5',
+    'empty object': '{}',
+    'no tool_name': JSON.stringify({ tool_input: { file_path: mem('alice') } }),
+    'empty tool_name': JSON.stringify({ tool_name: '', tool_input: { file_path: mem('alice') } }),
+    'numeric tool_name': JSON.stringify({ tool_name: 5, tool_input: { file_path: mem('alice') } }),
+    'null tool_name': JSON.stringify({ tool_name: null }),
+    'tool_input is a string': JSON.stringify({ tool_name: 'Read', tool_input: mem('alice') }),
+    'tool_input missing': JSON.stringify({ tool_name: 'Read' }),
+    'binary junk': '\u0000\u0001\u0002{',
+  };
+  for (const [label, raw] of Object.entries(inputs)) {
+    for (const user of ['alice', 'bob']) {
+      const r = await callRaw(chatEnv(user), raw);
+      assert.equal(r.decision, 'deny', `${user}: ${label}`);
+    }
+  }
+});
+
+test('chat run fails closed: missing or invalid user, data directory or run id', { skip }, async () => {
   for (const user of [undefined, '', 'mallory', 'ALICE', '../alice', 'alice bob', 'alice\n', 'a*']) {
     for (const [tool, input] of [
-      ['Read', { file_path: '/path/to/harmless.txt' }],
+      ['Read', { file_path: mem('alice') }],
       ['WebSearch', { query: 'x' }],
       ['mcp__claude_ai_Oura__get_daily_sleep', {}],
     ]) {
@@ -154,9 +304,6 @@ test('chat run fails closed: missing or invalid user denies even harmless calls'
       assert.equal(r.decision, 'deny', `user=${JSON.stringify(user)} ${tool}`);
     }
   }
-});
-
-test('chat run fails closed without a usable data directory', { skip }, async () => {
   for (const data of [undefined, '', 'relative/path']) {
     const env = chatEnv('alice');
     if (data === undefined) delete env.APOLLO_CHAT_DATA;
@@ -165,6 +312,16 @@ test('chat run fails closed without a usable data directory', { skip }, async ()
       (await call(env, 'Read', { file_path: mem('alice') })).decision,
       'deny',
       JSON.stringify(data),
+    );
+  }
+  for (const run of [undefined, '', 'short', '../x', 'run id with spaces', 'x'.repeat(65)]) {
+    const env = chatEnv('alice');
+    if (run === undefined) delete env.APOLLO_RUN_ID;
+    else env.APOLLO_RUN_ID = run;
+    assert.equal(
+      (await call(env, 'Read', { file_path: mem('alice') })).decision,
+      'deny',
+      JSON.stringify(run),
     );
   }
 });
@@ -249,19 +406,19 @@ test(
   { skip },
   async () => {
     const jobs = [];
-    for (let round = 0; round < 6; round++) {
+    for (let round = 0; round < 3; round++) {
       for (const [me, other] of [
         ['alice', 'bob'],
         ['bob', 'alice'],
       ]) {
-        for (const [tool, input] of allowedFor(me).slice(0, 5))
-          jobs.push(call(chatEnv(me), tool, input).then((r) => ({ want: 'allow', r, me, tool })));
-        for (const [tool, input] of deniedFor(me, other).slice(0, 8))
-          jobs.push(call(chatEnv(me), tool, input).then((r) => ({ want: 'deny', r, me, tool })));
+        for (const [label, tool, input] of allowedFor(me))
+          jobs.push(call(chatEnv(me), tool, input).then((r) => ({ want: 'allow', r, me, label })));
+        for (const [label, tool, input] of deniedFor(me, other))
+          jobs.push(call(chatEnv(me), tool, input).then((r) => ({ want: 'deny', r, me, label })));
       }
     }
     const results = await Promise.all(jobs);
-    assert.ok(results.length > 150);
-    for (const x of results) assert.equal(x.r.decision, x.want, `${x.me} ${x.tool}`);
+    assert.ok(results.length > 500);
+    for (const x of results) assert.equal(x.r.decision, x.want, `${x.me}: ${x.label}`);
   },
 );
