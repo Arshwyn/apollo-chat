@@ -19,6 +19,8 @@ command -v jq >/dev/null 2>&1 || {
 : "${APOLLO_USERS:=user_a user_b}"   # space separated user ids, as used in the memory folders
 : "${APOLLO_CONNECTORS_user_a:=mcp__*Onyx*UserA* mcp__*Oura*}"   # connector tool globs each user may use
 : "${APOLLO_CONNECTORS_user_b:=mcp__*Onyx*UserB*}"
+# Shared start-up files in the memory root that chat runs may READ (exact files only, no per-user data).
+: "${APOLLO_SHARED_FILES:=persona.md rules.md MEMORY.md}"
 root=${APOLLO_ROOT:-$HOME/.claude/agent-memory/apollo}
 lock=$root/.active-user
 in=$(cat)
@@ -69,6 +71,22 @@ chat_run() {
     fi
     deny "apollo-isolation: that path is outside this run's own folders."
   }
+  # shared_ok <value>: true only when the canonical path EQUALS <canonical root>/<name> for one of the
+  # shared files. Equality, not prefix: siblings, suffixes, directories and symlink swaps (a symlink
+  # resolves elsewhere, so it no longer equals) all fail.
+  shared_ok() {
+    local v=$1 c rc n re='[][*?{}]'
+    [[ $v == /* ]] || return 1
+    [[ $v =~ [[:cntrl:]] ]] && return 1
+    [[ $v =~ $re ]] && return 1
+    c=$(realpath -m -- "$v" 2>/dev/null) && [ -n "$c" ] || return 1
+    rc=$(realpath -m -- "$root" 2>/dev/null) && [ -n "$rc" ] || return 1
+    for n in $APOLLO_SHARED_FILES; do
+      [[ $n == */* || $n == . || $n == .. ]] && continue
+      [ "$c" = "$rc/$n" ] && return 0
+    done
+    return 1
+  }
   # A relative glob or filter: no absolute or home-relative start, no leading **, no parent hops.
   check_pattern() {
     local p=$1
@@ -79,13 +97,14 @@ chat_run() {
 
   case "$tool" in
     Read)
-      check_path "$(field file_path)" read;;
+      p=$(field file_path)
+      shared_ok "$p" || check_path "$p" read;;
     Write|Edit)
       check_path "$(field file_path)" write;;
     Grep)
       # path is required: a search with no path would start in the working directory.
       p=$(field path) || deny "apollo-isolation: a path is required."
-      check_path "$p" read
+      shared_ok "$p" || check_path "$p" read
       if g=$(field glob); then check_pattern "$g"; fi;;
     Glob)
       p=$(field path) || deny "apollo-isolation: a path is required."
