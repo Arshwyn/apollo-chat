@@ -34,6 +34,11 @@ if (!skip) {
     fs.mkdirSync(path.join(fx.data, 'users', u, 'tmp', RUN), { recursive: true });
     fs.mkdirSync(path.join(fx.data, 'users', u, 'tmp', 'run-other-000'), { recursive: true });
   }
+  // Shared start-up files in the memory root, plus look-alikes, and a mailbox directory next to the root.
+  for (const f of ['persona.md', 'rules.md', 'MEMORY.md', 'persona.md.bak', 'rules.md~', 'other.md'])
+    fs.writeFileSync(path.join(fx.root, f), 'shared');
+  fs.mkdirSync(path.join(path.dirname(fx.root), 'mailbox', 'apollo', 'inbox'), { recursive: true });
+  fs.writeFileSync(path.join(path.dirname(fx.root), 'mailbox', 'apollo', 'inbox', 'note.md'), 'mail');
   // Symlinks planted inside each user's own folders that point at the other user's folders.
   for (const [me, other] of [
     ['alice', 'bob'],
@@ -92,6 +97,7 @@ const mem = (u, f = 'profile.md') => p(fx.root, u, f);
 const tr = (u, f = 'a.txt') => p(fx.data, 'users', u, 'transcripts', f);
 const photo = (u, run = RUN) => p(fx.data, 'users', u, 'tmp', run, 'a.jpg');
 
+const SHARED = ['persona.md', 'rules.md', 'MEMORY.md'];
 const allowedFor = (me) => [
   ['Read own memory', 'Read', { file_path: mem(me) }],
   [
@@ -109,6 +115,12 @@ const allowedFor = (me) => [
   ['Grep own memory', 'Grep', { pattern: 'Intake', path: mem(me, 'history') }],
   ['Glob own memory', 'Glob', { pattern: 'history/**/*.md', path: p(fx.root, me) }],
   ['Glob own transcripts', 'Glob', { pattern: '*.txt', path: p(fx.data, 'users', me, 'transcripts') }],
+  ...SHARED.flatMap((n) => [
+    [`Read shared ${n}`, 'Read', { file_path: p(fx.root, n) }],
+    [`Grep exactly shared ${n}`, 'Grep', { pattern: 'x', path: p(fx.root, n) }],
+  ]),
+  ['Read shared file via ./', 'Read', { file_path: `${fx.root}/./persona.md` }],
+  ['Read shared file via //', 'Read', { file_path: `${fx.root}//rules.md` }],
   ['Read this run photo', 'Read', { file_path: photo(me) }],
   ['own Onyx connector', 'mcp__claude_ai_Onyx_-_' + cap(me) + '__get_user_settings', {}],
   ['WebSearch', 'WebSearch', { query: 'protein sources' }],
@@ -131,6 +143,45 @@ const deniedFor = (me, other) => {
     ['Bash find over the parent', 'Bash', { command: `find ${path.dirname(fx.root)} -name '*'` }],
     ['Bash with quoting and variables', 'Bash', { command: `d=${fx.root}; cat "$d"/'${other}'/profile.md` }],
     ['BashOutput', 'BashOutput', { bash_id: '1' }],
+    // shared files are read-only and matched by equality
+    ...SHARED.flatMap((n) => [
+      [`Write shared ${n}`, 'Write', { file_path: p(fx.root, n), content: 'x' }],
+      [`Edit shared ${n}`, 'Edit', { file_path: p(fx.root, n), old_string: 'a', new_string: 'b' }],
+      [`Glob over shared ${n}`, 'Glob', { pattern: n, path: fx.root }],
+      [`Read ${n} with a backup suffix`, 'Read', { file_path: `${p(fx.root, n)}.bak` }],
+      [`Read ${n} with a trailing space`, 'Read', { file_path: `${p(fx.root, n)} ` }],
+      [`Read ${n} as a directory`, 'Read', { file_path: `${p(fx.root, n)}/x` }],
+      [
+        `Read ${n} with a parent hop into the other user`,
+        'Read',
+        { file_path: `${p(fx.root, n)}/../${other}/profile.md` },
+      ],
+      [`Read ${n} with different case`, 'Read', { file_path: p(fx.root, n.toUpperCase()) }],
+      [`Grep ${n} with a parent hop`, 'Grep', { pattern: 'x', path: `${fx.root}/x/../../${n}` }],
+      [`Read ${n} one directory up`, 'Read', { file_path: p(path.dirname(fx.root), n) }],
+    ]),
+    ['Read a look-alike backup file', 'Read', { file_path: p(fx.root, 'persona.md.bak') }],
+    ['Read another file in the root', 'Read', { file_path: p(fx.root, 'other.md') }],
+    ['Read the root directory', 'Read', { file_path: fx.root }],
+    ['Grep the root directory', 'Grep', { pattern: 'x', path: fx.root }],
+    ['Grep shared file with wildcard', 'Grep', { pattern: 'x', path: p(fx.root, '*.md') }],
+    ['Read shared file with wildcard', 'Read', { file_path: p(fx.root, 'pers*.md') }],
+    [
+      'Read the mailbox inbox note',
+      'Read',
+      { file_path: p(path.dirname(fx.root), 'mailbox', 'apollo', 'inbox', 'note.md') },
+    ],
+    [
+      'Glob the mailbox inbox',
+      'Glob',
+      { pattern: '*', path: p(path.dirname(fx.root), 'mailbox', 'apollo', 'inbox') },
+    ],
+    ['Grep the mailbox dir', 'Grep', { pattern: 'x', path: p(path.dirname(fx.root), 'mailbox') }],
+    [
+      'Write into the mailbox',
+      'Write',
+      { file_path: p(path.dirname(fx.root), 'mailbox', 'apollo', 'archive', 'x.md'), content: 'x' },
+    ],
     // the other user's data, literally
     ['Read other memory', 'Read', { file_path: mem(other) }],
     ['Read other transcript', 'Read', { file_path: tr(other) }],
@@ -400,6 +451,32 @@ test(
     );
   },
 );
+
+test(
+  'a shared file swapped for a symlink to another user is denied (equality, not target)',
+  { skip },
+  async () => {
+    const root2 = p(fx.dir, 'root2');
+    fs.mkdirSync(p(root2, 'bob'), { recursive: true });
+    fs.writeFileSync(p(root2, 'bob', 'profile.md'), 'private');
+    fs.writeFileSync(p(root2, 'MEMORY.md'), 'shared');
+    fs.symlinkSync(p(root2, 'bob', 'profile.md'), p(root2, 'persona.md'));
+    const env = chatEnv('alice', { APOLLO_ROOT: root2 });
+    assert.equal((await call(env, 'Read', { file_path: p(root2, 'persona.md') })).decision, 'deny');
+    assert.equal((await call(env, 'Grep', { pattern: 'x', path: p(root2, 'persona.md') })).decision, 'deny');
+    assert.equal((await call(env, 'Read', { file_path: p(root2, 'bob', 'profile.md') })).decision, 'deny');
+    assert.equal((await call(env, 'Read', { file_path: p(root2, 'MEMORY.md') })).decision, 'allow');
+  },
+);
+
+test('the shared file list is configurable and only plain file names count', { skip }, async () => {
+  const env = chatEnv('alice', { APOLLO_SHARED_FILES: 'rules.md ../escape sub/x.md .' });
+  assert.equal((await call(env, 'Read', { file_path: p(fx.root, 'rules.md') })).decision, 'allow');
+  assert.equal((await call(env, 'Read', { file_path: p(fx.root, 'persona.md') })).decision, 'deny');
+  assert.equal((await call(env, 'Read', { file_path: p(path.dirname(fx.root), 'escape') })).decision, 'deny');
+  assert.equal((await call(env, 'Read', { file_path: p(fx.root, 'sub', 'x.md') })).decision, 'deny');
+  assert.equal((await call(env, 'Read', { file_path: fx.root })).decision, 'deny');
+});
 
 test(
   'parallel runs for both users never leak: interleaved calls keep their own verdicts',
