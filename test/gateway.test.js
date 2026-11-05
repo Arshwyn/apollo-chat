@@ -117,17 +117,30 @@ test('fixed argv, cwd and an exact minimal environment, set by the gateway only'
     assert.equal(info.argv[0], '-p');
     assert.deepEqual(info.argv.slice(1, 4), ['--agent', 'apollo', '--no-session-persistence']);
     assert.ok(info.argv.includes('dontAsk'));
+    const allowList = info.argv[info.argv.indexOf('--allowedTools') + 1].split(',');
+    const denyList = info.argv[info.argv.indexOf('--disallowedTools') + 1].split(',');
+    assert.equal(allowList.includes('Bash'), false, 'the argv no longer lists Bash as allowed');
+    assert.ok(denyList.includes('Bash'));
     const adds = info.argv.flatMap((a, i) => (a === '--add-dir' ? [info.argv[i + 1]] : []));
     assert.deepEqual(adds, [
       path.join(t.dataDir, 'users', 'alice', 'tmp', 'run-aaaaaaaa'),
       path.join(t.dataDir, 'users', 'alice', 'transcripts'),
     ]);
     assert.equal(info.cwd, fs.realpathSync(path.join(t.dataDir, 'users', 'alice', 'work')));
-    const allowed = new Set(['PATH', 'HOME', 'LANG', 'APOLLO_USER', 'APOLLO_CHAT_RUN', 'APOLLO_CHAT_DATA']);
+    const allowed = new Set([
+      'PATH',
+      'HOME',
+      'LANG',
+      'APOLLO_USER',
+      'APOLLO_CHAT_RUN',
+      'APOLLO_CHAT_DATA',
+      'APOLLO_RUN_ID',
+    ]);
     for (const k of Object.keys(info.env)) assert.ok(allowed.has(k), `unexpected env ${k}`);
     assert.equal(info.env.APOLLO_USER, 'alice');
     assert.equal(info.env.APOLLO_CHAT_RUN, '1');
     assert.equal(info.env.APOLLO_CHAT_DATA, t.dataDir);
+    assert.equal(info.env.APOLLO_RUN_ID, 'run-aaaaaaaa');
     assert.equal(info.env.SENTINEL_SECRET, undefined);
     assert.equal(info.prompt, 'INFO');
   } finally {
@@ -140,6 +153,14 @@ test('tool lists: own connectors allowed, other users and non-health connectors 
   const a = toolLists(USERS, 'alice');
   assert.ok(a.allowed.includes('mcp__claude_ai_Onyx_-_Alice') && a.allowed.includes('mcp__claude_ai_Oura'));
   assert.ok(a.disallowed.includes('mcp__claude_ai_Onyx_-_Bob'));
+  assert.equal(a.allowed.includes('Bash'), false, 'chat runs have no shell');
+  assert.ok(a.disallowed.includes('Bash'));
+  assert.ok(
+    a.allowed.includes('Read') &&
+      a.allowed.includes('Grep') &&
+      a.allowed.includes('Glob') &&
+      a.allowed.includes('Write'),
+  );
   assert.ok(!a.disallowed.includes('mcp__claude_ai_Oura'));
   for (const n of ['Gmail', 'Google_Calendar', 'Google_Drive', 'Claude_Docs'])
     assert.ok(a.disallowed.includes(`mcp__claude_ai_${n}`));
@@ -154,14 +175,18 @@ test('argv has no photo dir without photos and the env builder ignores everythin
   const cfg = { dataDir: '/path/to/data', users: USERS };
   const argv = buildArgv(cfg, { user: 'bob', runId: 'run-bbbbbbbb', photos: [] });
   assert.deepEqual(argv.filter((a) => a === '--add-dir').length, 1);
-  assert.deepEqual(buildEnv(cfg, 'bob', { PATH: '/bin', HOME: '/h', SECRET: 'x', LANG: 'C' }), {
-    PATH: '/bin',
-    APOLLO_USER: 'bob',
-    APOLLO_CHAT_RUN: '1',
-    APOLLO_CHAT_DATA: '/path/to/data',
-    HOME: '/h',
-    LANG: 'C',
-  });
+  assert.deepEqual(
+    buildEnv(cfg, 'bob', 'run-bbbbbbbb', { PATH: '/bin', HOME: '/h', SECRET: 'x', LANG: 'C' }),
+    {
+      PATH: '/bin',
+      APOLLO_USER: 'bob',
+      APOLLO_CHAT_RUN: '1',
+      APOLLO_CHAT_DATA: '/path/to/data',
+      APOLLO_RUN_ID: 'run-bbbbbbbb',
+      HOME: '/h',
+      LANG: 'C',
+    },
+  );
 });
 
 test('invalid requests are rejected and nothing is spawned', async () => {
