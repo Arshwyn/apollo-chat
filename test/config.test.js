@@ -1,0 +1,39 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { loadConfig, ConfigError, parseUsers } from '../src/config.js';
+
+const base = {
+  DATA_DIR: '/path/to/data',
+  CF_ACCESS_TEAM_DOMAIN: 'example-team.cloudflareaccess.com',
+  CF_ACCESS_AUD: 'aud-tag',
+  USERS: 'a@example.com:alice,b@example.com:bob',
+  GATEWAY_SOCKET_DIR: '/path/to/socket',
+  APOLLO_MEMORY_ROOT: '/path/to/memory',
+};
+
+test('loads a valid configuration with defaults', () => {
+  const c = loadConfig(base, { appDir: '/srv/app' });
+  assert.equal(c.maxRuns, 2);
+  assert.equal(c.tzName, 'UTC');
+  assert.deepEqual(c.userIds, ['alice', 'bob']);
+  assert.equal(c.users.get('a@example.com'), 'alice');
+});
+
+test('refuses a DATA_DIR that is relative or inside the app directory', () => {
+  assert.throws(() => loadConfig({ ...base, DATA_DIR: 'data' }), ConfigError);
+  assert.throws(
+    () => loadConfig({ ...base, DATA_DIR: '/srv/app/data' }, { appDir: '/srv/app' }),
+    ConfigError,
+  );
+  assert.throws(() => loadConfig({ ...base, DATA_DIR: '/srv/app' }, { appDir: '/srv/app' }), ConfigError);
+  assert.doesNotThrow(() => loadConfig({ ...base, DATA_DIR: '/srv/app-data' }, { appDir: '/srv/app' }));
+});
+
+test('rejects bad USERS, time zone and numbers', () => {
+  assert.throws(() => parseUsers(''), ConfigError);
+  assert.throws(() => parseUsers('nocolon'), ConfigError);
+  assert.throws(() => parseUsers('a@example.com:Bad Name'), ConfigError);
+  assert.throws(() => parseUsers('a@example.com:alice,A@example.com:bob'), ConfigError);
+  assert.throws(() => loadConfig({ ...base, TZ_NAME: 'Not/AZone' }), ConfigError);
+  assert.throws(() => loadConfig({ ...base, MAX_RUNS: '0' }), ConfigError);
+});
