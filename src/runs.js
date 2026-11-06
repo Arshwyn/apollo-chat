@@ -74,7 +74,7 @@ export class RunManager {
     if (this.running.size >= this.config.maxRuns) throw new HttpError(429, 'busy', { busy: true });
   }
 
-  start({ user, conversationId, text, photoIds = [] }) {
+  start({ user, conversationId, text, photoIds = [], timeZone }) {
     const store = this.stores.forUser(user);
     const conv = store.getConversation(conversationId);
     if (!conv) throw new HttpError(404, 'not found');
@@ -84,6 +84,7 @@ export class RunManager {
     this.#admit(user);
     const list = this.#checkRate(user);
     const runId = 'run-' + crypto.randomBytes(12).toString('hex');
+    const zone = store.resolveZone(timeZone);
     const photoPaths = claimPhotos({ dataDir: this.config.dataDir, user, runId, photoIds });
     list.push(this.now());
     const userMessage = store.addMessage({
@@ -104,6 +105,7 @@ export class RunManager {
       conversationId,
       runId,
       text: clean,
+      timeZone: zone,
       photoPaths,
       userMessage,
       assistantMessage,
@@ -112,7 +114,7 @@ export class RunManager {
 
   // Re-run the last user message of a conversation whose last reply failed or was cancelled. Photos from
   // the failed run are still on disk (24 h at most), so the same run directory is reused.
-  retry({ user, conversationId }) {
+  retry({ user, conversationId, timeZone }) {
     const store = this.stores.forUser(user);
     const conv = store.getConversation(conversationId);
     if (!conv) throw new HttpError(404, 'not found');
@@ -131,12 +133,14 @@ export class RunManager {
       photoPaths = dir && fs.existsSync(dir) ? fs.readdirSync(dir).map((n) => path.join(dir, n)) : [];
       if (photoPaths.length === 0) throw new HttpError(410, 'photos expired');
     }
+    const zone = store.resolveZone(timeZone);
     const assistantMessage = store.updateMessage(last.id, { text: '', status: 'running' });
     return this.#launch({
       user,
       conversationId,
       runId: userMessage.runId,
       text: userMessage.text,
+      timeZone: zone,
       photoPaths,
       userMessage,
       assistantMessage,
@@ -245,7 +249,7 @@ export class RunManager {
       history,
       text: userMessage.text,
       nowMs: this.now(),
-      timeZone: this.config.tzName,
+      timeZone: state.timeZone,
     });
 
     let res = await this.#attempt(state, prompt);
@@ -280,7 +284,7 @@ export class RunManager {
         user,
         store,
         conversationId,
-        timeZone: this.config.tzName,
+        timeZone: state.timeZone,
       });
     } catch {
       this.logger.event('transcript_failed', { user });

@@ -26,10 +26,19 @@ const opts = (method, body) => ({
   body: body === undefined ? undefined : JSON.stringify(body),
 });
 
+// The browser's IANA time zone, so Apollo's dates follow where the user is. The server validates it.
+const zone = () => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    return undefined;
+  }
+};
+
 export const api = {
   me: () => fetch('/api/me', opts('GET')).then(json),
   conversations: () => fetch('/api/conversations', opts('GET')).then(json),
-  createConversation: () => fetch('/api/conversations', opts('POST')).then(json),
+  createConversation: () => fetch('/api/conversations', opts('POST', { timeZone: zone() })).then(json),
   messages: (id, before) =>
     fetch(`/api/conversations/${id}/messages?limit=50${before ? `&before=${before}` : ''}`, opts('GET')).then(
       json,
@@ -55,6 +64,6 @@ export const api = {
     }
   },
   send: (id, text, photoIds, onEvent) =>
-    api.stream(`/api/conversations/${id}/messages`, { text, photoIds }, onEvent),
-  retry: (id, onEvent) => api.stream(`/api/conversations/${id}/retry`, undefined, onEvent),
+    api.stream(`/api/conversations/${id}/messages`, { text, photoIds, timeZone: zone() }, onEvent),
+  retry: (id, onEvent) => api.stream(`/api/conversations/${id}/retry`, { timeZone: zone() }, onEvent),
 };
