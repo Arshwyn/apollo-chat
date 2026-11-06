@@ -75,23 +75,28 @@ chat_run() {
   # shared files. Equality, not prefix: siblings, suffixes, directories and symlink swaps (a symlink
   # resolves elsewhere, so it no longer equals) all fail.
   shared_ok() {
-    local v=$1 c rc n re='[][*?{}]'
+    local v=$1 c rc n re='[][*?{}]' names
     [[ $v == /* ]] || return 1
     [[ $v =~ [[:cntrl:]] ]] && return 1
     [[ $v =~ $re ]] && return 1
     c=$(realpath -m -- "$v" 2>/dev/null) && [ -n "$c" ] || return 1
     rc=$(realpath -m -- "$root" 2>/dev/null) && [ -n "$rc" ] || return 1
-    for n in $APOLLO_SHARED_FILES; do
-      [[ $n == */* || $n == . || $n == .. ]] && continue
+    # Split without pathname expansion (read, not an unquoted expansion); only plain filenames count.
+    read -r -a names <<<"$APOLLO_SHARED_FILES"
+    for n in "${names[@]}"; do
+      [[ $n =~ ^[A-Za-z0-9._-]+$ && $n != . && $n != .. ]] || continue
       [ "$c" = "$rc/$n" ] && return 0
     done
     return 1
   }
-  # A relative glob or filter: no absolute or home-relative start, no leading **, no parent hops.
+  # A relative glob or filter, only ever a filter UNDER the already confined path argument: no absolute
+  # or home-relative start, no parent hops, no brace or bracket forms (they could spell a parent hop or
+  # expand to an absolute path), no control characters. A leading ** is fine: it cannot leave the path.
   check_pattern() {
-    local p=$1
-    [[ $p == /* || $p == '~'* || $p == '**'* ]] && deny "apollo-isolation: pattern must be relative and not start with a wildcard."
+    local p=$1 re='[][{}]'
+    [[ $p == /* || $p == '~'* ]] && deny "apollo-isolation: pattern must be relative."
     [[ $p =~ (^|/)\.\.(/|$) ]] && deny "apollo-isolation: parent paths are not allowed."
+    [[ $p =~ $re ]] && deny "apollo-isolation: braces and brackets are not allowed in a pattern."
     [[ $p =~ [[:cntrl:]] ]] && deny "apollo-isolation: control characters in a pattern."
   }
 
@@ -114,8 +119,9 @@ chat_run() {
     WebSearch|WebFetch|ToolSearch)
       : ;;
     mcp__*)
-      local var="APOLLO_CONNECTORS_$me" ok=1 g
-      for g in ${!var}; do
+      local var="APOLLO_CONNECTORS_$me" ok=1 g globs
+      read -r -a globs <<<"${!var}"
+      for g in "${globs[@]}"; do
         # shellcheck disable=SC2053
         [[ $tool == $g ]] && ok=0 && break
       done
@@ -171,7 +177,8 @@ fi
 case "$tool" in
   mcp__*)
     var="APOLLO_CONNECTORS_$me"; ok=1
-    for g in ${!var}; do
+    read -r -a globs <<<"${!var}"
+    for g in "${globs[@]}"; do
       # shellcheck disable=SC2053
       [[ $tool == $g ]] && ok=0 && break
     done
