@@ -34,6 +34,7 @@ export function chatRoutes({ runs }) {
           conversationId: params.id,
           text: body.text,
           photoIds: body.photoIds || [],
+          timeZone: body.timeZone,
         });
         await sse(res, handle);
       },
@@ -41,8 +42,9 @@ export function chatRoutes({ runs }) {
     [
       'POST',
       '/api/conversations/:id/retry',
-      async ({ res, user, params }) => {
-        await sse(res, runs.retry({ user, conversationId: params.id }));
+      async ({ req, res, user, params }) => {
+        const body = await readJson(req);
+        await sse(res, runs.retry({ user, conversationId: params.id, timeZone: body.timeZone }));
       },
     ],
     [

@@ -17,9 +17,12 @@ export function localClock(ms, timeZone) {
     hour: '2-digit',
     minute: '2-digit',
     hourCycle: 'h23',
+    timeZoneName: 'longOffset',
   }).formatToParts(new Date(ms));
   const get = (t) => parts.find((p) => p.type === t).value;
-  return `${get('weekday')} ${localDate(ms, timeZone)}, ${get('hour')}:${get('minute')} (${timeZone})`;
+  // "GMT-05:00" -> "UTC-05:00"; plain "GMT" -> "UTC+00:00".
+  const offset = get('timeZoneName').replace('GMT', 'UTC');
+  return `${get('weekday')} ${localDate(ms, timeZone)}, ${get('hour')}:${get('minute')} (${timeZone}, ${offset === 'UTC' ? 'UTC+00:00' : offset})`;
 }
 
 // The prompt names exactly one user and that user's folders. The other user is never mentioned.

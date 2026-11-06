@@ -157,7 +157,15 @@ function coreRoutes({ config, stores, isBusy }) {
       '/api/conversations',
       ({ user }) => ({ conversations: stores.forUser(user).listConversations() }),
     ],
-    ['POST', '/api/conversations', ({ user }) => stores.forUser(user).createConversation()],
+    [
+      'POST',
+      '/api/conversations',
+      async ({ req, user }) => {
+        // The body (a client time zone) is optional and never an error: a bad one is ignored.
+        const body = await readJson(req).catch(() => ({}));
+        return stores.forUser(user).createConversation(body.timeZone);
+      },
+    ],
     [
       'GET',
       '/api/conversations/:id/messages',

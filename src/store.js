@@ -3,6 +3,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import Database from 'better-sqlite3';
 import { USER_ID } from './config.js';
+import { parseZone } from './timezone.js';
 import { nextAutoName, cleanTitle } from './naming.js';
 
 // One SQLite file per user (users/<user>/chat.db). There is no shared database, so a store opened
@@ -48,6 +49,10 @@ CREATE TABLE IF NOT EXISTS messages (
   run_id TEXT
 );
 CREATE INDEX IF NOT EXISTS messages_conv ON messages(conversation_id, seq);
+CREATE TABLE IF NOT EXISTS settings (
+  key TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
 `;
 
 const MSG_COLS =
@@ -70,15 +75,32 @@ export class UserStore {
     this.db.close();
   }
 
-  createConversation() {
+  // The zone for this user's dates: a valid zone sent by the client (remembered as the last known one),
+  // else the last valid zone stored, else the configured fallback. Per-user DB only.
+  resolveZone(candidate) {
+    const sent = parseZone(candidate);
+    if (sent) {
+      this.db
+        .prepare(
+          "INSERT INTO settings (key, value) VALUES ('time_zone', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        )
+        .run(sent);
+      return sent;
+    }
+    const row = this.db.prepare("SELECT value FROM settings WHERE key = 'time_zone'").get();
+    return parseZone(row?.value) || this.tzName;
+  }
+
+  createConversation(clientZone) {
     const now = this.now();
+    const zone = this.resolveZone(clientZone);
     const titles = this.db
       .prepare('SELECT title FROM conversations')
       .all()
       .map((r) => r.title);
     const c = {
       id: crypto.randomUUID(),
-      title: nextAutoName(titles, now, this.tzName),
+      title: nextAutoName(titles, now, zone),
       created: now,
       updated: now,
     };
@@ -188,7 +210,7 @@ export class UserStore {
   }
 
   deleteAll() {
-    this.db.exec('DELETE FROM messages; DELETE FROM conversations;');
+    this.db.exec('DELETE FROM messages; DELETE FROM conversations; DELETE FROM settings;');
   }
 }
 
