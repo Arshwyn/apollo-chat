@@ -25,6 +25,7 @@
       <div id="offline" hidden>You are offline. Chats load when you reconnect.</div>
       <main id="messages" aria-live="polite"></main>
       <div id="status" hidden></div>
+      <div id="toast" role="status" aria-live="polite"></div>
       <form id="composer" autocomplete="off">
         <div id="previews"></div>
         <div id="row">
@@ -41,6 +42,7 @@
           <button id="close-drawer" type="button" aria-label="Close">&times;</button>
         </div>
         <ul id="chat-list"></ul>
+        <button id="copy-chat" type="button">Copy conversation</button>
         <button id="delete-all" type="button">Delete all my chats</button>
       </aside>
     </div>

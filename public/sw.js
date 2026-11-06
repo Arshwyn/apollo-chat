@@ -1,12 +1,13 @@
 // App-shell service worker. It caches the static shell only. Anything under /api/ (chats, photos) is
 // never read from or written to a cache: health data must not sit in a shared browser cache.
-const CACHE = 'apollo-shell-v1';
+const CACHE = 'apollo-shell-v2';
 const SHELL = [
   '/',
   '/style.css',
   '/js/app.js',
   '/js/api.js',
   '/js/render.js',
+  '/js/copy.js',
   '/js/format.js',
   '/js/sse.js',
   '/manifest.webmanifest',

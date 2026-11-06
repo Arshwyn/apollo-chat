@@ -1,5 +1,6 @@
 import { api, ApiError } from './api.js';
 import { messageEl, renderBody } from './render.js';
+import { conversationToText, copyText } from './copy.js';
 
 const MAX_PHOTOS = 4;
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -18,6 +19,7 @@ const els = {
   drawer: $('drawer'),
   list: $('chat-list'),
   offline: $('offline'),
+  toast: $('toast'),
 };
 
 const state = { conv: null, convs: [], busy: false, photos: [], oldest: null, poll: null };
@@ -28,6 +30,39 @@ function note(text, cls = '') {
   n.textContent = text;
   els.messages.append(n);
   return n;
+}
+
+let toastTimer = null;
+// Brief visible feedback; the element is an aria-live status region so screen readers announce it too.
+function toast(text) {
+  clearTimeout(toastTimer);
+  els.toast.textContent = text;
+  toastTimer = setTimeout(() => (els.toast.textContent = ''), 1800);
+}
+
+async function copyWithFeedback(text) {
+  toast((await copyText(text)) ? 'Copied' : 'Could not copy');
+}
+
+async function copyConversation() {
+  if (!state.conv) return;
+  els.drawer.hidden = true;
+  try {
+    // Page back through the whole chat, not just the part currently on screen.
+    let all = [];
+    let before;
+    for (;;) {
+      const data = await api.messages(state.conv.id, before);
+      all = data.messages.concat(all);
+      if (data.messages.length < 50) break;
+      before = data.messages[0].seq;
+    }
+    const text = conversationToText(all);
+    if (!text) return toast('Nothing to copy');
+    await copyWithFeedback(text);
+  } catch {
+    toast('Could not copy');
+  }
 }
 
 function nearBottom() {
@@ -115,7 +150,7 @@ async function newConversation() {
 function renderMessages(list, { prepend = false } = {}) {
   const frag = document.createDocumentFragment();
   for (const m of list) {
-    frag.append(messageEl(m));
+    frag.append(messageEl(m, copyWithFeedback));
     if (m.role === 'assistant' && (m.status === 'error' || m.status === 'cancelled')) {
       frag.append(failedNote(m));
     }
@@ -248,7 +283,7 @@ async function send() {
   autosize();
   const ids = ready.map((p) => p.id);
   const shown = { id: 'tmp', role: 'user', text, photoCount: ids.length };
-  els.messages.append(messageEl(shown));
+  els.messages.append(messageEl(shown, copyWithFeedback));
   for (const p of state.photos) URL.revokeObjectURL(p.url);
   state.photos = [];
   els.previews.replaceChildren();
@@ -321,6 +356,7 @@ els.input.addEventListener('input', autosize);
 els.cancel.addEventListener('click', () => state.conv && api.cancel(state.conv.id).catch(() => {}));
 $('menu-btn').addEventListener('click', () => (els.drawer.hidden = false));
 $('close-drawer').addEventListener('click', () => (els.drawer.hidden = true));
+$('copy-chat').addEventListener('click', () => copyConversation());
 $('new-btn').addEventListener('click', () => newConversation());
 $('delete-all').addEventListener('click', async () => {
   if (!window.confirm('Delete all your chats? This cannot be undone.')) return;
