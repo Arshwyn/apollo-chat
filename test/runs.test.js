@@ -558,6 +558,65 @@ test('a blocked call names only its category, never a path or reason', async () 
   }
 });
 
+const toolUse = (id, name) =>
+  JSON.stringify({ type: 'assistant', message: { content: [{ type: 'tool_use', id, name, input: {} }] } });
+const toolResult = (id, blocked) =>
+  JSON.stringify({
+    type: 'user',
+    message: {
+      content: [
+        {
+          type: 'tool_result',
+          tool_use_id: id,
+          is_error: blocked,
+          content: blocked ? 'apollo-isolation: denied' : 'fine',
+        },
+      ],
+    },
+  });
+
+async function replyFor(lines, finalText) {
+  const t = setup(async (req, { onLine }) => {
+    for (const l of lines) onLine(l);
+    if (finalText) onLine(delta(finalText));
+    onLine(result(finalText));
+    return ok();
+  });
+  try {
+    const conv = t.stores.forUser('alice').createConversation();
+    const h = t.runs.start({ user: 'alice', conversationId: conv.id, text: 'hi' });
+    await h.done;
+    return t.stores.forUser('alice').lastMessage(conv.id);
+  } finally {
+    t.done();
+  }
+}
+
+test('no blocked note when a blocked call was followed by a successful tool call', async () => {
+  const last = await replyFor(
+    [toolUse('a', 'Glob'), toolResult('a', true), toolUse('b', 'Read'), toolResult('b', false)],
+    'All good.',
+  );
+  assert.equal(last.status, 'done');
+  assert.equal(last.text, 'All good.');
+});
+
+test('blocked note when the last tool call was blocked', async () => {
+  const last = await replyFor(
+    [toolUse('a', 'Read'), toolResult('a', false), toolUse('b', 'Glob'), toolResult('b', true)],
+    'Partial answer.',
+  );
+  assert.equal(last.text, 'Partial answer.\n\nThat request was blocked (file access).');
+});
+
+test('blocked note when the final text is empty after a blocked call mid-run', async () => {
+  const last = await replyFor(
+    [toolUse('a', 'Glob'), toolResult('a', true), toolUse('b', 'Read'), toolResult('b', false)],
+    '',
+  );
+  assert.equal(last.text, 'That request was blocked (file access).');
+});
+
 test('blockedNote falls back to the generic note and blockCategory is generic', () => {
   assert.equal(blockedNote(new Set()), 'That request was blocked.');
   assert.equal(blockedNote(new Set(['file access'])), 'That request was blocked (file access).');
