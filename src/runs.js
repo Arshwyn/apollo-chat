@@ -167,6 +167,7 @@ export class RunManager {
       events,
       text: '',
       blocked: false,
+      lastCallBlocked: false,
       blockedCategories: new Set(),
       cancelRequested: false,
       started: false,
@@ -183,6 +184,7 @@ export class RunManager {
     const parser = createStreamParser();
     state.text = '';
     state.lastInterim = '';
+    state.lastCallBlocked = false;
     let result = null;
     if (state.abort.signal.aborted || state.cancelRequested)
       return { exit: null, result, error: new GatewayError('aborted') };
@@ -209,9 +211,12 @@ export class RunManager {
                 state.lastInterim = ev.text;
                 state.text = '';
                 state.events.emit('interim', { text: ev.text });
-              } else if (ev.kind === 'tool') state.events.emit('tool', { name: ev.name });
-              else if (ev.kind === 'blocked') {
+              } else if (ev.kind === 'tool') {
+                state.lastCallBlocked = false;
+                state.events.emit('tool', { name: ev.name });
+              } else if (ev.kind === 'blocked') {
                 state.blocked = true;
+                state.lastCallBlocked = true;
                 state.blockedCategories.add(ev.category);
               } else if (ev.kind === 'result') result = ev;
             }
@@ -257,7 +262,10 @@ export class RunManager {
     if (!text.trim() && state.lastInterim?.trim()) text = state.lastInterim;
     if (!text.trim() && res.result?.text) text = res.result.text;
     if (this.config.stripTrailerLines) text = stripTrailer(text);
-    if (state.blocked) text = (text ? text + '\n\n' : '') + blockedNote(state.blockedCategories);
+    // The generic note is for a reply that reports or depends on a blocked call: the last tool call was
+    // blocked, or there is no text at all. A blocked call followed by a successful one is not mentioned.
+    if (state.blocked && (state.lastCallBlocked || !text.trim()))
+      text = (text ? text + '\n\n' : '') + blockedNote(state.blockedCategories);
     const failed =
       Boolean(res.error) || !exit || exit.code !== 0 || exit.timedOut || res.result?.isError === true;
     const status = cancelled ? 'cancelled' : failed ? 'error' : 'done';
