@@ -1,4 +1,5 @@
 import { formatText } from './format.js';
+import { messageText } from './copy.js';
 
 function inline(parent, parts) {
   for (const part of parts) {
@@ -52,7 +53,7 @@ export function renderBody(el, text) {
   }
 }
 
-export function messageEl(m) {
+export function messageEl(m, onCopy) {
   const el = document.createElement('div');
   el.className = `msg ${m.role === 'user' ? 'user' : 'apollo'}`;
   el.dataset.id = m.id;
@@ -66,5 +67,17 @@ export function messageEl(m) {
   body.className = 'body';
   renderBody(body, m.text || '');
   el.append(body);
+  if (onCopy && messageText(m)) {
+    const actions = document.createElement('div');
+    actions.className = 'msg-actions';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'copy-btn';
+    btn.textContent = 'Copy';
+    btn.setAttribute('aria-label', `Copy ${m.role === 'user' ? 'your' : "Apollo's"} message`);
+    btn.addEventListener('click', () => onCopy(messageText(m)));
+    actions.append(btn);
+    el.append(actions);
+  }
   return el;
 }
