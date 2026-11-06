@@ -244,6 +244,8 @@ export class RunManager {
       photoPaths: state.photoPaths,
       history,
       text: userMessage.text,
+      nowMs: this.now(),
+      timeZone: this.config.tzName,
     });
 
     let res = await this.#attempt(state, prompt);
