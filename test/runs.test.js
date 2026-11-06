@@ -37,7 +37,7 @@ const jpeg = () =>
 function setup(gatewayImpl, configExtra = {}, now = () => Date.now()) {
   const dataDir = tmpDir();
   const config = testConfig(dataDir, configExtra);
-  const stores = new StoreRegistry({ dataDir, userIds: config.userIds, tzName: 'UTC', now });
+  const stores = new StoreRegistry({ dataDir, userIds: config.userIds, tzName: config.tzName, now });
   const logs = [];
   const calls = [];
   const gateway = {
@@ -617,24 +617,82 @@ test('blocked note when the final text is empty after a blocked call mid-run', a
   assert.equal(last.text, 'That request was blocked (file access).');
 });
 
-test('the run prompt carries the local date at run time, not at start-up', async () => {
-  let clock = Date.parse('2026-11-05T12:00:00Z');
-  const t = setup(
+function clockSetup(clockRef, configExtra = { tzName: 'America/New_York' }) {
+  return setup(
     async (req, { onLine }) => {
       onLine(delta('ok'));
       onLine(result('ok'));
       return ok();
     },
-    { tzName: 'America/New_York' },
-    () => clock,
+    configExtra,
+    () => clockRef.ms,
   );
+}
+const clockLine = (call) =>
+  /^Current date and time for this user: ([^\n]*?)\. Use this/.exec(call.prompt)?.[1];
+
+test('the run prompt carries the local date at run time, not at start-up', async () => {
+  const clock = { ms: Date.parse('2026-11-05T12:00:00Z') };
+  const t = clockSetup(clock);
   try {
     const conv = t.stores.forUser('alice').createConversation();
     await t.runs.start({ user: 'alice', conversationId: conv.id, text: 'hi' }).done;
-    clock = Date.parse('2026-11-06T00:14:00Z');
+    clock.ms = Date.parse('2026-11-06T00:14:00Z');
     await t.runs.start({ user: 'alice', conversationId: conv.id, text: 'again' }).done;
-    assert.match(t.calls[0].prompt, /^Current date and time for this user: Thursday 2026-11-05, 07:00 /);
-    assert.match(t.calls[1].prompt, /^Current date and time for this user: Thursday 2026-11-05, 19:14 /);
+    assert.equal(clockLine(t.calls[0]), 'Thursday 2026-11-05, 07:00 (America/New_York, UTC-05:00)');
+    assert.equal(clockLine(t.calls[1]), 'Thursday 2026-11-05, 19:14 (America/New_York, UTC-05:00)');
+  } finally {
+    t.done();
+  }
+});
+
+test('the client time zone wins, differs by place at the same instant and is remembered', async () => {
+  const clock = { ms: Date.parse('2026-11-06T00:14:00Z') };
+  const t = clockSetup(clock);
+  try {
+    const conv = t.stores.forUser('alice').createConversation();
+    const go = (timeZone) =>
+      t.runs.start({ user: 'alice', conversationId: conv.id, text: 'hi', timeZone }).done;
+    await go('America/New_York');
+    await go('Asia/Singapore');
+    // No zone sent: the last valid one (Singapore) is used, not the configured fallback.
+    await go(undefined);
+    // Invalid, oversized or odd values are ignored, never an error, and do not replace the stored zone.
+    for (const bad of [
+      'Not/AZone',
+      'x'.repeat(65),
+      '../../etc',
+      'UTC; rm -rf /',
+      42,
+      null,
+      '',
+      ['UTC'],
+      '+05:00',
+    ])
+      await go(bad);
+    assert.equal(clockLine(t.calls[0]), 'Thursday 2026-11-05, 19:14 (America/New_York, UTC-05:00)');
+    assert.equal(clockLine(t.calls[1]), 'Friday 2026-11-06, 08:14 (Asia/Singapore, UTC+08:00)');
+    for (const c of t.calls.slice(2))
+      assert.equal(clockLine(c), 'Friday 2026-11-06, 08:14 (Asia/Singapore, UTC+08:00)');
+    assert.equal(t.calls.length, 12);
+  } finally {
+    t.done();
+  }
+});
+
+test('with no valid zone known the configured TZ_NAME is the fallback; zones are per user', async () => {
+  const clock = { ms: Date.parse('2026-11-06T00:14:00Z') };
+  const t = clockSetup(clock, { tzName: 'UTC' });
+  try {
+    const a = t.stores.forUser('alice').createConversation();
+    const b = t.stores.forUser('bob').createConversation();
+    await t.runs.start({ user: 'alice', conversationId: a.id, text: 'hi', timeZone: 'Not/AZone' }).done;
+    await t.runs.start({ user: 'alice', conversationId: a.id, text: 'hi', timeZone: 'Asia/Tokyo' }).done;
+    await t.runs.start({ user: 'bob', conversationId: b.id, text: 'hi' }).done;
+    assert.equal(clockLine(t.calls[0]), 'Friday 2026-11-06, 00:14 (UTC, UTC+00:00)');
+    assert.equal(clockLine(t.calls[1]), 'Friday 2026-11-06, 09:14 (Asia/Tokyo, UTC+09:00)');
+    assert.equal(clockLine(t.calls[2]), 'Friday 2026-11-06, 00:14 (UTC, UTC+00:00)');
+    assert.equal(t.logs.join('\n').includes('Tokyo'), false, 'the zone is not logged');
   } finally {
     t.done();
   }

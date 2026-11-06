@@ -110,33 +110,35 @@ test('trigger detection', () => {
 test('prompt opens with the local date and time in the configured zone', () => {
   const NY = 'America/New_York';
   const cases = [
-    ['2026-11-06T00:14:00Z', NY, 'Thursday 2026-11-05, 19:14 (America/New_York)'],
-    ['2026-11-05T04:30:00Z', NY, 'Wednesday 2026-11-04, 23:30 (America/New_York)'],
-    ['2026-11-05T05:30:00Z', NY, 'Thursday 2026-11-05, 00:30 (America/New_York)'],
+    ['2026-11-06T00:14:00Z', NY, 'Thursday 2026-11-05, 19:14 (America/New_York, UTC-05:00)'],
+    ['2026-11-05T04:30:00Z', NY, 'Wednesday 2026-11-04, 23:30 (America/New_York, UTC-05:00)'],
+    ['2026-11-05T05:30:00Z', NY, 'Thursday 2026-11-05, 00:30 (America/New_York, UTC-05:00)'],
     // DST: spring forward 2026-03-08 (EST to EDT at 07:00Z), fall back 2026-11-01 (EDT to EST at 06:00Z).
-    ['2026-03-08T06:59:00Z', NY, 'Sunday 2026-03-08, 01:59 (America/New_York)'],
-    ['2026-03-08T07:00:00Z', NY, 'Sunday 2026-03-08, 03:00 (America/New_York)'],
-    ['2026-03-09T03:59:00Z', NY, 'Sunday 2026-03-08, 23:59 (America/New_York)'],
-    ['2026-03-09T04:00:00Z', NY, 'Monday 2026-03-09, 00:00 (America/New_York)'],
-    ['2026-11-01T05:30:00Z', NY, 'Sunday 2026-11-01, 01:30 (America/New_York)'],
-    ['2026-11-01T06:30:00Z', NY, 'Sunday 2026-11-01, 01:30 (America/New_York)'],
-    ['2026-11-02T04:59:00Z', NY, 'Sunday 2026-11-01, 23:59 (America/New_York)'],
-    ['2026-11-02T05:00:00Z', NY, 'Monday 2026-11-02, 00:00 (America/New_York)'],
-    ['2026-11-06T00:14:00Z', 'UTC', 'Friday 2026-11-06, 00:14 (UTC)'],
+    ['2026-03-08T06:59:00Z', NY, 'Sunday 2026-03-08, 01:59 (America/New_York, UTC-05:00)'],
+    ['2026-03-08T07:00:00Z', NY, 'Sunday 2026-03-08, 03:00 (America/New_York, UTC-04:00)'],
+    ['2026-03-09T03:59:00Z', NY, 'Sunday 2026-03-08, 23:59 (America/New_York, UTC-04:00)'],
+    ['2026-03-09T04:00:00Z', NY, 'Monday 2026-03-09, 00:00 (America/New_York, UTC-04:00)'],
+    ['2026-11-01T05:30:00Z', NY, 'Sunday 2026-11-01, 01:30 (America/New_York, UTC-04:00)'],
+    ['2026-11-01T06:30:00Z', NY, 'Sunday 2026-11-01, 01:30 (America/New_York, UTC-05:00)'],
+    ['2026-11-02T04:59:00Z', NY, 'Sunday 2026-11-01, 23:59 (America/New_York, UTC-05:00)'],
+    ['2026-11-02T05:00:00Z', NY, 'Monday 2026-11-02, 00:00 (America/New_York, UTC-05:00)'],
+    ['2026-11-06T00:14:00Z', 'UTC', 'Friday 2026-11-06, 00:14 (UTC, UTC+00:00)'],
   ];
   for (const [iso, zone, want] of cases)
     assert.equal(localClock(Date.parse(iso), zone), want, `${iso} ${zone}`);
   const base = { user: 'alice', memoryRoot: '/m', transcriptsDir: '/t', text: 'x' };
   const p = buildPrompt({ ...base, nowMs: Date.parse('2026-11-06T00:14:00Z'), timeZone: 'America/New_York' });
   assert.ok(
-    p.startsWith('Current date and time for this user: Thursday 2026-11-05, 19:14 (America/New_York).'),
+    p.startsWith(
+      'Current date and time for this user: Thursday 2026-11-05, 19:14 (America/New_York, UTC-05:00).',
+    ),
   );
   assert.match(p, /history\/YYYY\/MM\/DD/);
   assert.match(p, /Ignore any other date you are shown/);
   // Without a zone or clock the prompt still carries a date (UTC).
   assert.match(
     buildPrompt(base),
-    /^Current date and time for this user: \w+ \d{4}-\d{2}-\d{2}, \d{2}:\d{2} \(UTC\)\./,
+    /^Current date and time for this user: \w+ \d{4}-\d{2}-\d{2}, \d{2}:\d{2} \(UTC, UTC\+00:00\)\./,
   );
 });
 
