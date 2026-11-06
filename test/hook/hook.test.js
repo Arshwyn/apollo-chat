@@ -69,9 +69,9 @@ const chatEnv = (user, extra = {}) => ({
   ...extra,
 });
 
-function callRaw(env, raw) {
+function callRaw(env, raw, cwd) {
   return new Promise((resolve, reject) => {
-    const p = spawn('bash', [HOOK], { env, stdio: ['pipe', 'pipe', 'pipe'] });
+    const p = spawn('bash', [HOOK], { env, cwd, stdio: ['pipe', 'pipe', 'pipe'] });
     let out = '';
     p.stdout.on('data', (d) => (out += d));
     p.stderr.on('data', () => {});
@@ -85,10 +85,11 @@ function callRaw(env, raw) {
     p.stdin.end(raw);
   });
 }
-const call = (env, tool, input, { agent = 'apollo' } = {}) =>
+const call = (env, tool, input, { agent = 'apollo', cwd } = {}) =>
   callRaw(
     env,
     JSON.stringify({ hook_event_name: 'PreToolUse', tool_name: tool, tool_input: input, agent_type: agent }),
+    cwd,
   );
 
 const p = (...parts) => path.join(...parts);
@@ -114,6 +115,15 @@ const allowedFor = (me) => [
   ],
   ['Grep own memory', 'Grep', { pattern: 'Intake', path: mem(me, 'history') }],
   ['Glob own memory', 'Glob', { pattern: 'history/**/*.md', path: p(fx.root, me) }],
+  ...['**/*', '**/*.md', '*.md', 'history/**/*.md'].flatMap((pat) => [
+    [`Glob own memory with ${pat}`, 'Glob', { pattern: pat, path: p(fx.root, me) }],
+    [`Grep own memory with glob filter ${pat}`, 'Grep', { pattern: 'x', path: p(fx.root, me), glob: pat }],
+  ]),
+  [
+    'Glob ** naming another user only filters under the own folder',
+    'Glob',
+    { pattern: `**/${me === 'alice' ? 'bob' : 'alice'}/**`, path: p(fx.root, me) },
+  ],
   ['Glob own transcripts', 'Glob', { pattern: '*.txt', path: p(fx.data, 'users', me, 'transcripts') }],
   ...SHARED.flatMap((n) => [
     [`Read shared ${n}`, 'Read', { file_path: p(fx.root, n) }],
@@ -256,7 +266,27 @@ const deniedFor = (me, other) => {
     ['Read null path', 'Read', { file_path: null }],
     ['Read with control character path', 'Read', { file_path: `${mine}/a\nb` }],
     // patterns
-    ['Glob pattern starting with **', 'Glob', { pattern: `**/${other}/**`, path: mine }],
+    ...['**/*', '**/*.md', '*.md', 'history/**/*.md'].flatMap((pat) =>
+      [
+        ['memory root', fx.root],
+        ["the other user's folder", p(fx.root, other)],
+        ['the data root', fx.data],
+        ['the parent of the memory root', path.dirname(fx.root)],
+      ].map(([what, dir]) => [`Glob ${pat} over ${what}`, 'Glob', { pattern: pat, path: dir }]),
+    ),
+    ['Grep glob filter ** over the memory root', 'Grep', { pattern: 'x', path: fx.root, glob: '**/*.md' }],
+    ['Glob ** pattern with parent hop', 'Glob', { pattern: `**/../${other}/*`, path: mine }],
+    ['Glob ** pattern with trailing parent hop', 'Glob', { pattern: '**/..', path: mine }],
+    ['Glob ** pattern absolute', 'Glob', { pattern: `/${'**'}/*`, path: mine }],
+    ['Glob brace pattern', 'Glob', { pattern: '{a,b}/*.md', path: mine }],
+    ['Glob brace parent hop', 'Glob', { pattern: '{..,x}/*', path: mine }],
+    ['Glob bracket parent hop', 'Glob', { pattern: '[.][.]/*', path: mine }],
+    ['Glob bracket class', 'Glob', { pattern: 'a[0-9].md', path: mine }],
+    ['Glob closing bracket only', 'Glob', { pattern: 'a].md', path: mine }],
+    ['Grep brace glob filter', 'Grep', { pattern: 'x', path: mine, glob: '*.{md,txt}' }],
+    ['Grep bracket glob filter', 'Grep', { pattern: 'x', path: mine, glob: '[.][.]/*' }],
+    ['Glob pattern with a control character', 'Glob', { pattern: '*.md\nx', path: mine }],
+    ['Glob ** without path', 'Glob', { pattern: '**/*' }],
     ['Glob pattern starting with /', 'Glob', { pattern: `${fx.root}/*/profile.md`, path: mine }],
     ['Glob pattern with parent hop', 'Glob', { pattern: `../${other}/*`, path: mine }],
     ['Glob pattern with home', 'Glob', { pattern: '~/x', path: mine }],
@@ -283,6 +313,36 @@ test('chat run: each user may use their own data and tools', { skip }, async () 
     }
   }
 });
+
+test(
+  'chat run: shared-file and connector lists are not expanded against the working directory',
+  { skip },
+  async () => {
+    const cwd = tmpDir('ac-hook-cwd-');
+    try {
+      for (const f of ['other.md', 'mcp__Gmail__x']) fs.writeFileSync(path.join(cwd, f), 'x');
+      const env = chatEnv('alice', {
+        APOLLO_SHARED_FILES: '*.md persona.md',
+        APOLLO_CONNECTORS_alice: 'mcp__*',
+      });
+      // '*.md' is not a plain filename, so it is ignored (and never expanded to other.md); persona.md still works.
+      assert.equal(
+        (await call(env, 'Read', { file_path: p(fx.root, 'other.md') }, { cwd })).decision,
+        'deny',
+      );
+      assert.equal(
+        (await call(env, 'Read', { file_path: p(fx.root, 'persona.md') }, { cwd })).decision,
+        'allow',
+      );
+      // A connector glob still matches by pattern, not by files in the working directory.
+      const env2 = chatEnv('alice', { APOLLO_CONNECTORS_alice: 'mcp__*Oura*' });
+      assert.equal((await call(env2, 'mcp__Gmail__x', {}, { cwd })).decision, 'deny');
+      assert.equal((await call(env2, 'mcp__claude_ai_Oura__get', {}, { cwd })).decision, 'allow');
+    } finally {
+      rmDir(cwd);
+    }
+  },
+);
 
 test('chat run: every denied input class is denied for both users', { skip }, async () => {
   for (const [me, other] of [
