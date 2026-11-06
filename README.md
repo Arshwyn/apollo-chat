@@ -38,17 +38,21 @@ The app is a thin wrapper. The agent itself (Claude Code, `--agent apollo`) runs
 
 All settings come from the environment (`.env` for the app, a separate env file for the gateway). Placeholders only here; see [`.env.example`](.env.example) and [`gateway/gateway.env.example`](gateway/gateway.env.example).
 
-| Variable                                            | Meaning                                                                                    |
-| --------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD`            | Cloudflare Access team domain and application audience tag                                 |
-| `USERS`                                             | `email:user` pairs; user ids are `[a-z][a-z0-9_]{1,19}`                                    |
-| `DATA_DIR`                                          | Absolute data directory, outside the repository (the app refuses to start inside it)       |
-| `GATEWAY_SOCKET_DIR`                                | Directory that holds `gateway.sock`                                                        |
-| `APOLLO_MEMORY_ROOT`                                | The agent's memory root as the host sees it (used to name the user's folder in the prompt) |
-| `TZ_NAME`                                           | IANA time zone for chat names and transcripts (default `UTC`)                              |
-| `RUN_TIMEOUT_MS`, `MAX_RUNS`, `RATE_LIMIT_PER_HOUR` | Run timeout (default 300000), global concurrency (2), messages per user per hour (30)      |
-| `PHOTO_TTL_HOURS`, `REPLAY_TURNS`                   | Failed-run photo retention (24), earlier text turns replayed into each prompt (20)         |
-| `TRIGGER_PHRASES`, `STRIP_TRAILER_LINES`            | Day-file trigger phrases; drop trailing `mail:`/`temp:` housekeeping lines from replies    |
+| Variable                                            | Meaning                                                                                     |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD`            | Cloudflare Access team domain and application audience tag                                  |
+| `USERS`                                             | `email:user` pairs; user ids are `[a-z][a-z0-9_]{1,19}`                                     |
+| `DATA_DIR`                                          | Absolute data directory, outside the repository (the app refuses to start inside it)        |
+| `GATEWAY_SOCKET_DIR`                                | Directory that holds `gateway.sock`                                                         |
+| `APOLLO_MEMORY_ROOT`                                | The agent's memory root as the host sees it (used to name the user's folder in the prompt)  |
+| `TZ_NAME`                                           | IANA time zone for chat names, transcripts and the date in the agent prompt (default `UTC`) |
+| `RUN_TIMEOUT_MS`, `MAX_RUNS`, `RATE_LIMIT_PER_HOUR` | Run timeout (default 300000), global concurrency (2), messages per user per hour (30)       |
+| `PHOTO_TTL_HOURS`, `REPLAY_TURNS`                   | Failed-run photo retention (24), earlier text turns replayed into each prompt (20)          |
+| `TRIGGER_PHRASES`, `STRIP_TRAILER_LINES`            | Day-file trigger phrases; drop trailing `mail:`/`temp:` housekeeping lines from replies     |
+
+The host clock is UTC. Every run prompt opens with the user's local weekday, date and time in `TZ_NAME`, computed when the run starts, and tells the agent to use it for the day-file folder, "today"/"yesterday" and connector date arguments. The gateway's day-file check looks at file modification times under the user's history folder, so it needs no date.
+
+Chat runs have no shell and no `/tmp`: the prompt tells the agent to skip the temp-file and mail trailer steps and not to glob without a path. A generic "That request was blocked" line is appended to a reply only when the run's last tool call was blocked or the reply text is empty; a blocked call followed by a successful one is not mentioned.
 
 The gateway has its own variables (`DATA_DIR`, `SOCKET_DIR`, `CLAUDE_BIN`, `GATEWAY_USERS`, `APOLLO_MEMORY_ROOT`, `RUN_TIMEOUT_MS`, `MAX_RUNS`); `GATEWAY_USERS` maps each user to the connector tool prefixes their runs may use.
 
