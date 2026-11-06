@@ -39,19 +39,19 @@ The app is a thin wrapper. The agent itself (Claude Code, `--agent apollo`) runs
 
 All settings come from the environment (`.env` for the app, a separate env file for the gateway). Placeholders only here; see [`.env.example`](.env.example) and [`gateway/gateway.env.example`](gateway/gateway.env.example).
 
-| Variable                                            | Meaning                                                                                     |
-| --------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD`            | Cloudflare Access team domain and application audience tag                                  |
-| `USERS`                                             | `email:user` pairs; user ids are `[a-z][a-z0-9_]{1,19}`                                     |
-| `DATA_DIR`                                          | Absolute data directory, outside the repository (the app refuses to start inside it)        |
-| `GATEWAY_SOCKET_DIR`                                | Directory that holds `gateway.sock`                                                         |
-| `APOLLO_MEMORY_ROOT`                                | The agent's memory root as the host sees it (used to name the user's folder in the prompt)  |
-| `TZ_NAME`                                           | IANA time zone for chat names, transcripts and the date in the agent prompt (default `UTC`) |
-| `RUN_TIMEOUT_MS`, `MAX_RUNS`, `RATE_LIMIT_PER_HOUR` | Run timeout (default 300000), global concurrency (2), messages per user per hour (30)       |
-| `PHOTO_TTL_HOURS`, `REPLAY_TURNS`                   | Failed-run photo retention (24), earlier text turns replayed into each prompt (20)          |
-| `TRIGGER_PHRASES`, `STRIP_TRAILER_LINES`            | Day-file trigger phrases; drop trailing `mail:`/`temp:` housekeeping lines from replies     |
+| Variable                                            | Meaning                                                                                    |
+| --------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `CF_ACCESS_TEAM_DOMAIN`, `CF_ACCESS_AUD`            | Cloudflare Access team domain and application audience tag                                 |
+| `USERS`                                             | `email:user` pairs; user ids are `[a-z][a-z0-9_]{1,19}`                                    |
+| `DATA_DIR`                                          | Absolute data directory, outside the repository (the app refuses to start inside it)       |
+| `GATEWAY_SOCKET_DIR`                                | Directory that holds `gateway.sock`                                                        |
+| `APOLLO_MEMORY_ROOT`                                | The agent's memory root as the host sees it (used to name the user's folder in the prompt) |
+| `TZ_NAME`                                           | Fallback IANA time zone when the browser has sent none (default `UTC`)                     |
+| `RUN_TIMEOUT_MS`, `MAX_RUNS`, `RATE_LIMIT_PER_HOUR` | Run timeout (default 300000), global concurrency (2), messages per user per hour (30)      |
+| `PHOTO_TTL_HOURS`, `REPLAY_TURNS`                   | Failed-run photo retention (24), earlier text turns replayed into each prompt (20)         |
+| `TRIGGER_PHRASES`, `STRIP_TRAILER_LINES`            | Day-file trigger phrases; drop trailing `mail:`/`temp:` housekeeping lines from replies    |
 
-The host clock is UTC. Every run prompt opens with the user's local weekday, date and time in `TZ_NAME`, computed when the run starts, and tells the agent to use it for the day-file folder, "today"/"yesterday" and connector date arguments. The gateway's day-file check looks at file modification times under the user's history folder, so it needs no date.
+The host clock is UTC, so dates follow the user instead. The browser sends its IANA time zone (`Intl.DateTimeFormat().resolvedOptions().timeZone`) with every message, retry and new-chat request. The server accepts it only if it is a plain zone name of at most 64 characters that `Intl` knows; anything else is ignored, never an error. The last valid zone is stored in that user's own database (never shared between users, never logged, never used in a path or shell) and is used when a request has none; `TZ_NAME` applies only when nothing valid is known. A change of place takes effect on the next message. The resolved zone drives the chat auto-name (`YYYY-MM-DD`, `(2)`, ...), transcript timestamps and the first line of every run prompt, computed when the run starts: weekday, local date, time, zone and UTC offset, with the instruction to use it for the day-file folder, "today"/"yesterday" and connector date arguments. The gateway's day-file check compares file modification times under the user's history folder and builds no date path, so it needs no zone. Edge: it looks at the history folders for the UTC year and the one before, so a run on 1 January local time east of UTC, while UTC is still 31 December, may log a spurious missing-day-file warning (no effect on the reply).
 
 Chat runs have no shell and no `/tmp`: the prompt tells the agent to skip the temp-file and mail trailer steps and not to glob without a path. A generic "That request was blocked" line is appended to a reply only when the run's last tool call was blocked or the reply text is empty; a blocked call followed by a successful one is not mentioned.
 
