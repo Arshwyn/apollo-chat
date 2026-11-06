@@ -617,6 +617,29 @@ test('blocked note when the final text is empty after a blocked call mid-run', a
   assert.equal(last.text, 'That request was blocked (file access).');
 });
 
+test('the run prompt carries the local date at run time, not at start-up', async () => {
+  let clock = Date.parse('2026-11-05T12:00:00Z');
+  const t = setup(
+    async (req, { onLine }) => {
+      onLine(delta('ok'));
+      onLine(result('ok'));
+      return ok();
+    },
+    { tzName: 'America/New_York' },
+    () => clock,
+  );
+  try {
+    const conv = t.stores.forUser('alice').createConversation();
+    await t.runs.start({ user: 'alice', conversationId: conv.id, text: 'hi' }).done;
+    clock = Date.parse('2026-11-06T00:14:00Z');
+    await t.runs.start({ user: 'alice', conversationId: conv.id, text: 'again' }).done;
+    assert.match(t.calls[0].prompt, /^Current date and time for this user: Thursday 2026-11-05, 07:00 /);
+    assert.match(t.calls[1].prompt, /^Current date and time for this user: Thursday 2026-11-05, 19:14 /);
+  } finally {
+    t.done();
+  }
+});
+
 test('blockedNote falls back to the generic note and blockCategory is generic', () => {
   assert.equal(blockedNote(new Set()), 'That request was blocked.');
   assert.equal(blockedNote(new Set(['file access'])), 'That request was blocked (file access).');
