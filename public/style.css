@@ -156,44 +156,56 @@ button:disabled {
 #messages {
   flex: 1;
   overflow-y: auto;
-  padding: 12px;
+  padding: var(--space-5) 18px var(--space-2);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 18px;
 }
 .msg {
-  max-width: 88%;
-  padding: 8px 12px;
-  border-radius: 14px;
-  border: 1px solid var(--line);
   overflow-wrap: anywhere;
 }
+/* The person's turn: a small sans block on the right. */
 .msg.user {
   align-self: flex-end;
+  max-width: 78%;
+  padding: 9px 13px;
   background: var(--mine);
+  color: var(--on-mine);
+  border-radius: var(--radius-l) var(--radius-l) var(--space-1) var(--radius-l);
+  font: 400 var(--text-m) / 1.45 var(--font-body);
 }
+/* The coach speaks in serif prose with no bubble. */
 .msg.apollo {
   align-self: flex-start;
-  background: var(--surface);
+  max-width: var(--measure);
+  font: 400 var(--text-l) / 1.65 var(--font-display);
 }
 .msg p,
 .msg ul {
-  margin: 0 0 6px;
+  margin: 0 0 10px;
 }
 .msg p:last-child,
 .msg ul:last-child {
   margin-bottom: 0;
 }
 .msg ul {
-  padding-left: 1.2em;
+  padding-left: 1.3em;
+}
+.msg li + li {
+  margin-top: var(--space-1);
+}
+.msg strong {
+  font-weight: 600;
 }
 .msg h3,
 .msg h4 {
-  margin: 10px 0 4px;
+  margin: 14px 0 6px;
+  font-family: var(--font-display);
+  font-weight: 600;
   line-height: 1.3;
 }
 .msg h3 {
-  font-size: 1.1em;
+  font-size: 1.2em;
 }
 .msg h4 {
   font-size: 1em;
@@ -205,31 +217,39 @@ button:disabled {
 }
 .table-wrap {
   overflow-x: auto;
-  margin: 0 0 6px;
+  margin: 4px 0 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  background: var(--surface);
   -webkit-overflow-scrolling: touch;
 }
 .msg table {
+  width: 100%;
   border-collapse: collapse;
-  font-size: 0.92em;
+  font: 400 0.88rem / 1.3 var(--font-body);
+  font-variant-numeric: tabular-nums;
 }
 .msg th,
 .msg td {
-  border: 1px solid var(--line);
-  padding: 4px 8px;
+  padding: 9px 12px;
   text-align: left;
   white-space: nowrap;
+  border-bottom: 1px solid var(--line);
 }
 .msg th {
-  background: var(--bg);
+  font-weight: 600;
+  color: var(--muted);
+}
+.msg tr:last-child td {
+  border-bottom: 0;
 }
 .photo-chip {
   display: inline-block;
   margin: 0 6px 6px 0;
-  padding: 2px 8px;
-  border: 1px dashed var(--line);
-  border-radius: 999px;
-  color: var(--muted);
-  font-size: 0.85rem;
+  padding: 2px 10px;
+  border: 1px dashed currentColor;
+  border-radius: var(--radius-pill);
+  font-size: var(--text-s);
 }
 .note {
   align-self: center;
@@ -242,10 +262,21 @@ button:disabled {
 .older {
   align-self: center;
 }
+/* Interim line while a reply is being written (tool label stays generic). */
 #status {
-  padding: 2px 14px;
+  padding: 2px 18px;
+  max-width: var(--measure);
   color: var(--muted);
-  font-size: 0.85rem;
+  font: italic 400 0.9rem / 1.4 var(--font-display);
+}
+/* Positive "on plan" semantic. Not wired to any content yet; olive appears nowhere else. */
+.on-plan {
+  display: inline-block;
+  padding: 5px 9px;
+  border-radius: var(--radius-pill);
+  background: var(--olive-bg);
+  color: var(--olive);
+  font: 600 0.78rem / 1 var(--font-body);
 }
 #composer {
   padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
