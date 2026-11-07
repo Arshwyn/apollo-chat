@@ -20,7 +20,7 @@ The app is a thin wrapper. The agent itself (Claude Code, `--agent apollo`) runs
 - `gateway/gateway.mjs`: the host-side runner. Dependency-free, runs on a plain Node 20.
 - `public/`: the PWA (vanilla JS, no build step).
 - `docs/host/`: the proposed host isolation hook (not part of the app).
-- Docs: [`docs/DEPLOY.md`](docs/DEPLOY.md) (install and operate), [`docs/ISOLATION.md`](docs/ISOLATION.md) (threat model), [`docs/HOOK.md`](docs/HOOK.md) (host hook changes).
+- Docs: [`docs/DEPLOY.md`](docs/DEPLOY.md) (install and operate), [`docs/ISOLATION.md`](docs/ISOLATION.md) (threat model), [`docs/HOOK.md`](docs/HOOK.md) (host hook changes), [`docs/DESIGN.md`](docs/DESIGN.md) (visual identity and tokens).
 
 ## What it does
 
@@ -28,12 +28,12 @@ The app is a thin wrapper. The agent itself (Claude Code, `--agent apollo`) runs
 - **History:** one SQLite file per user (`users/<user>/chat.db`), text only. New chats are named by date (`YYYY-MM-DD`, then `(2)`, `(3)`) in `TZ_NAME`; chats can be renamed and deleted, and a user can delete everything they have.
 - **Photos are transient:** up to 4 per message, 10 MB each, JPEG/PNG/WebP by magic bytes. Each is auto-oriented, re-encoded (EXIF and GPS dropped), capped at 2000 px and staged under the user's temp folder. After a successful run the originals are deleted. A failed or cancelled run keeps them for at most 24 hours so Retry works; a sweep at startup and every 30 minutes removes anything older. History shows a "photo analysed" placeholder; no thumbnails or image bytes are ever stored.
 - **Streaming:** replies stream over server-sent events (`delta`, `interim`, `tool`, `done`, `error`). Only text and a generic tool label reach the browser; tool inputs, outputs and thinking are dropped. Only the text after the run's last tool call is stored, exported and shown as the reply; narration before a tool call arrives as `interim` and shows as a transient status line (if a run ends on a tool call, the last narration is kept so a reply is never empty).
-- **Rendering:** message text is parsed into plain data (paragraphs, bullets, `#`-`####` headings, pipe tables, `**bold**`) and the DOM is built with `createElement` and `textContent` only, never `innerHTML`, so HTML in a message is shown as text. Anything unrecognised stays plain text.
+- **Rendering:** message text is parsed into plain data (paragraphs, bullets, `#`-`####` headings, pipe tables, `**bold**`) and the DOM is built with `createElement` and `textContent` only, never `innerHTML`, so HTML in a message is shown as text. Anything unrecognised stays plain text. Replies are set as serif prose without a bubble; the person's own messages are small blocks on the right; tables scroll sideways inside their own frame. The look follows the OS light or dark setting (see `docs/DESIGN.md`).
 - **Busy handling:** one run at a time per user (a second send gets 409 and the UI says Apollo is still replying), users run in parallel, a global cap (`MAX_RUNS`) bounds the total, and a user can stop their own reply. A browser that disconnects does not stop the run: the reply is saved and shows on reload.
 - **Transcripts:** after each reply the app writes a plain-text per-user transcript (`users/<user>/transcripts/`, no images) that the agent may grep when asked about something said earlier. The agent never reads the chat database; its day files stay the analytic source of truth.
 - **Day-file check:** after a trigger-style message (a coaching trigger phrase or any message with photos) the gateway checks that a file in the user's history folder was written during the run, and the app logs a content-free warning if not.
-- **Copy:** every message bubble has a Copy button, and the chats drawer has "Copy conversation" (the whole chat as plain text, labelled `You:` and `Apollo:`, no timestamps or photo chips). Both copy the stored markdown source, not the rendered page, using the Clipboard API with a hidden-textarea fallback for non-secure contexts; a short "Copied" status (an `aria-live` region) confirms it, and touch targets are 44px on coarse pointers. Buttons, header and input chrome are `user-select: none`, so select-all and long-press select only message text. The clipboard interaction itself is not browser-tested; the text serialiser is covered by `test/copy.test.js`.
-- **PWA:** manifest, icons (any and maskable), and an app-shell service worker that never caches `/api/` or photos.
+- **Copy:** every message has a Copy button, and the chats drawer has "Copy conversation" (the whole chat as plain text, labelled `You:` and `Apollo:`, no timestamps or photo chips). Both copy the stored markdown source, not the rendered page, using the Clipboard API with a hidden-textarea fallback for non-secure contexts; a short "Copied" status (an `aria-live` region) confirms it, and touch targets are 44px on coarse pointers. Buttons, header and input chrome are `user-select: none`, so select-all and long-press select only message text. The clipboard interaction itself is not browser-tested; the text serialiser is covered by `test/copy.test.js`.
+- **PWA:** manifest, icons (any and maskable, regenerated by `npm run icons`), and an app-shell service worker that never caches `/api/` or photos. The shell includes the self-hosted font files, so the type renders offline too.
 
 ## Configuration
 
@@ -81,7 +81,7 @@ Open the site in Chrome, sign in through Access, then use the browser menu and c
 
 ## Privacy
 
-No analytics, telemetry, third-party scripts, fonts or external requests; a strict CSP (`default-src 'self'`). Logs hold only time, user id, method, route template, status, duration and run exit code, never message text, filenames, prompts, tokens or emails. Health data lives only in `DATA_DIR` (outside the repo, mode 0700) and in the agent's own memory folder. Each user can delete their data from the menu.
+No analytics, telemetry, third-party scripts or external requests (no external fonts either: the typefaces are self-hosted under `public/fonts/`); a strict CSP (`default-src 'self'`). Logs hold only time, user id, method, route template, status, duration and run exit code, never message text, filenames, prompts, tokens or emails. Health data lives only in `DATA_DIR` (outside the repo, mode 0700) and in the agent's own memory folder. Each user can delete their data from the menu.
 
 ## Design notes (why)
 
@@ -93,6 +93,10 @@ No analytics, telemetry, third-party scripts, fonts or external requests; a stri
 - **Per-user database files** make separation a matter of path, which the host hook can deny, instead of a `WHERE user = ?` that has to be right everywhere.
 - **Auto-names take the first free slot** for the day, so a deleted or renamed chat never causes a duplicate.
 - **User ids are configuration, not code**, so the repository carries no personal names; the hook and gateway take the real ids from the host.
+
+## Third-party assets
+
+- **Literata** (roman and italic, variable weight and optical size) and **Public Sans** (variable weight), latin subset, in `public/fonts/`. Both are licensed under the SIL Open Font License 1.1 (texts in `public/fonts/OFL-Literata.txt` and `public/fonts/OFL-PublicSans.txt`). The files are the woff2 builds from the `@fontsource-variable/literata` and `@fontsource-variable/public-sans` packages, version 5.3.0, copied in as static files; upstream projects: the Literata project (`googlefonts/literata`) and the Public Sans project (`uswds/public-sans`). No npm dependency is added.
 
 ## Licence
 
