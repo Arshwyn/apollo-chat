@@ -102,3 +102,17 @@ test('service worker source has no cache rule for the API', () => {
     false,
   );
 });
+
+test('every @font-face url in style.css is precached by the worker and exists on disk', () => {
+  const css = read('public/style.css');
+  const urls = [...css.matchAll(/@font-face[^}]*?url\(["']?([^)"']+)["']?\)/g)].map((m) => m[1]);
+  assert.equal(urls.length, 3, 'Literata roman and italic plus Public Sans');
+  const shell = /const SHELL = \[([\s\S]*?)\];/.exec(read('public/sw.js'))[1];
+  const entries = [...shell.matchAll(/'([^']+)'/g)].map((m) => m[1]);
+  for (const u of urls) {
+    assert.ok(u.startsWith('/fonts/'), `${u} is same-origin`);
+    assert.ok(entries.includes(u), `${u} is in SHELL`);
+    assert.ok(fs.existsSync(new URL(`../public${u}`, import.meta.url)), `${u} exists`);
+  }
+  assert.match(read('public/sw.js'), /apollo-shell-v3/);
+});
