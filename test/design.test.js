@@ -105,3 +105,10 @@ test('font licences are OFL 1.1 with an upstream copyright line', () => {
     assert.match(t, /SIL OPEN FONT LICENSE Version 1\.1/);
   }
 });
+
+test('coach replies take a definite width so wide tables scroll inside their frame', () => {
+  const rule = /\.msg\.apollo \{([^}]*)\}/.exec(css)[1];
+  assert.match(rule, /width:\s*100%/);
+  assert.match(rule, /max-width:\s*var\(--measure\)/);
+  assert.match(/\.table-wrap \{([^}]*)\}/.exec(css)[1], /overflow-x:\s*auto/);
+});
