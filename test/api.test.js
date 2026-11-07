@@ -169,6 +169,12 @@ test('the app shell is served to authenticated users only, with safe paths and t
     assert.match((await t.call('alice', 'GET', '/js/app.js')).headers.get('content-type'), /javascript/);
     assert.match((await t.call('alice', 'GET', '/style.css')).headers.get('content-type'), /text\/css/);
     assert.equal((await t.call(null, 'GET', '/style.css')).status, 401);
+    const font = await t.call('alice', 'GET', '/fonts/public-sans-latin-wght-normal.woff2');
+    assert.equal(font.status, 200);
+    assert.equal(font.headers.get('content-type'), 'font/woff2');
+    assert.equal(font.headers.get('x-content-type-options'), 'nosniff');
+    assert.match(font.headers.get('content-security-policy'), /^default-src 'self';/);
+    assert.equal((await t.call(null, 'GET', '/fonts/public-sans-latin-wght-normal.woff2')).status, 401);
     assert.equal((await t.call('alice', 'GET', '/..%2Fpackage.json')).status, 404);
     assert.equal((await t.call('alice', 'GET', '/%2e%2e/package.json')).status, 404);
     assert.equal((await t.call('alice', 'GET', '/js')).status, 404);
