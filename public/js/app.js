@@ -104,7 +104,7 @@ function renderList() {
     ren.textContent = 'Rename';
     ren.addEventListener('click', () => renameConversation(c));
     const del = document.createElement('button');
-    del.className = 'small';
+    del.className = 'small danger';
     del.type = 'button';
     del.textContent = 'Delete';
     del.addEventListener('click', () => deleteConversation(c));
