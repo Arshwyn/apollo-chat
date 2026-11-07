@@ -117,38 +117,106 @@ body {
 #bar {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: calc(8px + env(safe-area-inset-top)) 12px 8px;
+  gap: var(--space-2);
+  padding: calc(var(--space-2) + env(safe-area-inset-top)) var(--space-3) var(--space-2);
   background: var(--surface);
   border-bottom: 1px solid var(--line);
 }
 #bar h1 {
   flex: 1;
   margin: 0;
-  font-size: 1.05rem;
+  font: 600 var(--text-title) / 1.2 var(--font-display);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
-button {
-  font: inherit;
-  color: var(--text);
-  background: var(--surface);
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 8px 12px;
-  min-height: 40px;
+/* The one gold element: the sun mark. */
+.mark {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  color: var(--gold);
 }
-#send-btn {
-  background: var(--accent);
-  color: var(--on-accent);
-  border-color: var(--accent);
+.mark path {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+button {
+  font: 500 var(--text-m) / 1.2 var(--font-body);
+  color: var(--text);
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-m);
+  padding: 0 14px;
+  min-height: var(--tap);
+  min-width: var(--tap);
+  cursor: pointer;
 }
 button:disabled {
   opacity: 0.5;
+  cursor: default;
+}
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.icon-btn {
+  display: grid;
+  place-items: center;
+  width: var(--tap);
+  height: var(--tap);
+  padding: 0;
+  border: 0;
+  flex: none;
+}
+.icon-btn svg,
+#send-btn svg,
+.preview button svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+#send-btn {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  display: grid;
+  place-items: center;
+  flex: none;
+  border: 0;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+#send-btn svg {
+  width: 20px;
+  height: 20px;
+  stroke-width: 2;
+}
+/* Secondary actions: Stop, Retry, Load older. */
+#cancel-btn,
+.note button,
+.older {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+}
+#cancel-btn {
+  height: 44px;
+  border-radius: 22px;
+  padding: 0 18px;
+}
+.note button {
+  margin-left: var(--space-2);
 }
 #offline {
-  padding: 6px 12px;
+  padding: 6px var(--space-3);
   background: var(--danger);
   color: var(--on-danger);
   font-size: 0.9rem;
@@ -279,17 +347,17 @@ button:disabled {
   font: 600 0.78rem / 1 var(--font-body);
 }
 #composer {
-  padding: 8px 12px calc(8px + env(safe-area-inset-bottom));
-  background: var(--surface);
+  padding: 10px var(--space-3) calc(var(--space-3) + env(safe-area-inset-bottom));
+  background: var(--bg);
   border-top: 1px solid var(--line);
 }
 #previews {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   flex-wrap: wrap;
 }
 #previews:not(:empty) {
-  margin-bottom: 8px;
+  margin-bottom: var(--space-2);
 }
 .preview {
   position: relative;
@@ -298,37 +366,51 @@ button:disabled {
   width: 56px;
   height: 56px;
   object-fit: cover;
-  border-radius: 8px;
+  border-radius: var(--radius-s);
   border: 1px solid var(--line);
 }
 .preview.uploading img {
   opacity: 0.4;
 }
+/* The visible glyph is small; the button keeps the full tap target around it. */
 .preview button {
   position: absolute;
-  top: -8px;
-  right: -8px;
-  min-height: 24px;
-  width: 24px;
+  top: -14px;
+  right: -14px;
+  display: grid;
+  place-items: center;
+  width: var(--tap);
+  height: var(--tap);
   padding: 0;
+  border: 0;
+}
+.preview button svg {
+  box-sizing: border-box;
+  padding: 4px;
   border-radius: 50%;
-  line-height: 1;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  stroke-width: 2;
 }
 #row {
   display: flex;
-  gap: 8px;
+  gap: var(--space-2);
   align-items: flex-end;
 }
 #input {
   flex: 1;
+  min-height: 44px;
   resize: none;
   max-height: 140px;
-  font: inherit;
+  font: 400 1rem / 1.4 var(--font-body);
   color: var(--text);
-  background: var(--bg);
+  background: var(--surface);
   border: 1px solid var(--line);
-  border-radius: 12px;
-  padding: 8px 10px;
+  border-radius: 22px;
+  padding: 10px 14px;
+}
+#input::placeholder {
+  color: var(--muted);
 }
 #drawer {
   position: fixed;
@@ -395,39 +477,44 @@ button:disabled {
 }
 .msg-actions {
   display: flex;
+  margin-top: calc(var(--space-1) * -1);
+}
+.msg.user .msg-actions {
   justify-content: flex-end;
-  margin-top: 2px;
 }
 .copy-btn {
-  min-height: 32px;
-  padding: 2px 10px;
+  padding: 0 10px;
+  margin-left: -10px;
   border-color: transparent;
-  background: none;
   color: var(--muted);
-  font-size: 0.85rem;
+  font-size: var(--text-s);
 }
-@media (pointer: coarse) {
-  .copy-btn {
-    min-height: 44px;
-    min-width: 44px;
-  }
-}
-#copy-chat {
-  min-height: 44px;
+.msg.user .copy-btn {
+  color: inherit;
+  margin: 0 -10px 0 0;
 }
 #toast {
   position: fixed;
   left: 50%;
-  bottom: calc(80px + env(safe-area-inset-bottom));
+  bottom: calc(88px + env(safe-area-inset-bottom));
   transform: translateX(-50%);
-  padding: 8px 16px;
-  border-radius: 999px;
+  max-width: 90vw;
+  padding: var(--space-2) var(--space-4);
+  border-radius: var(--radius-pill);
   background: var(--text);
   color: var(--bg);
-  font-size: 0.9rem;
+  font: 500 0.9rem / 1.3 var(--font-body);
   pointer-events: none;
   z-index: 10;
 }
 #toast:empty {
   display: none;
+}
+@media (prefers-reduced-motion: no-preference) {
+  button {
+    transition:
+      background-color 0.15s ease,
+      color 0.15s ease,
+      border-color 0.15s ease;
+  }
 }

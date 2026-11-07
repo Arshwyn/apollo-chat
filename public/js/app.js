@@ -303,6 +303,19 @@ function autosize() {
   els.input.style.height = `${Math.min(els.input.scrollHeight, 140)}px`;
 }
 
+// Small "x" glyph built with DOM APIs (no innerHTML).
+function closeIcon() {
+  const ns = 'http://www.w3.org/2000/svg';
+  const svg = document.createElementNS(ns, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('focusable', 'false');
+  const path = document.createElementNS(ns, 'path');
+  path.setAttribute('d', 'M6 6l12 12M18 6 6 18');
+  svg.append(path);
+  return svg;
+}
+
 function addPreview(photo, file) {
   const wrap = document.createElement('div');
   wrap.className = 'preview uploading';
@@ -311,7 +324,7 @@ function addPreview(photo, file) {
   img.alt = '';
   const x = document.createElement('button');
   x.type = 'button';
-  x.textContent = '×';
+  x.append(closeIcon());
   x.setAttribute('aria-label', 'Remove photo');
   x.addEventListener('click', () => {
     state.photos = state.photos.filter((p) => p !== photo);
