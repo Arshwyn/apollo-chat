@@ -10,15 +10,16 @@
 #   2. Orchestrator runs (no APOLLO_CHAT_RUN): the single lock file, exactly as before. APOLLO_USER alone
 #      is ignored there, so a stray variable can never override the lock.
 #
-# Configuration: edit the defaults below (or export the variables). Globs are matched against the tool name.
+# Configuration: edit the defaults below (or export the variables). Globs are matched against the whole tool
+# name and should be anchored exact prefixes (mcp__<server-prefix>__*), never substrings (mcp__*Name*).
 command -v jq >/dev/null 2>&1 || {
   # Without jq nothing can be inspected. Chat runs fail closed; the orchestrator flow keeps its old behaviour.
   [ "${APOLLO_CHAT_RUN:-}" = 1 ] && printf '%s\n' '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"apollo-isolation: jq missing"}}'
   exit 0
 }
 : "${APOLLO_USERS:=user_a user_b}"   # space separated user ids, as used in the memory folders
-: "${APOLLO_CONNECTORS_user_a:=mcp__*Onyx*UserA* mcp__*Oura*}"   # connector tool globs each user may use
-: "${APOLLO_CONNECTORS_user_b:=mcp__*Onyx*UserB*}"
+: "${APOLLO_CONNECTORS_user_a:=mcp__claude_ai_Onyx_-_UserA__* mcp__claude_ai_Oura__*}"   # anchored connector tool globs each user may use
+: "${APOLLO_CONNECTORS_user_b:=mcp__claude_ai_Onyx_-_UserB__*}"
 # Shared start-up files in the memory root that chat runs may READ (exact files only, no per-user data).
 : "${APOLLO_SHARED_FILES:=persona.md rules.md MEMORY.md}"
 root=${APOLLO_ROOT:-$HOME/.claude/agent-memory/apollo}
