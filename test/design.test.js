@@ -54,10 +54,8 @@ function rulesUsing(token) {
     .map((m) => m[1].trim().replace(/\s+/g, ' '));
 }
 
-test('gold, olive and danger keep their single semantic roles', () => {
+test('gold and danger keep their single semantic roles', () => {
   assert.deepEqual(rulesUsing('--gold'), ['.mark']);
-  assert.deepEqual(rulesUsing('--olive'), ['.on-plan']);
-  assert.deepEqual(rulesUsing('--olive-bg'), ['.on-plan']);
   assert.deepEqual(rulesUsing('--danger').sort(), [
     '#chat-list .small.danger',
     '#delete-all',

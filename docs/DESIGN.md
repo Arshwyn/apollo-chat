@@ -14,24 +14,23 @@ Aegean blue and limestone: a pale warm stone ground, deep sea blue for action an
 
 Both sets are defined once as CSS custom properties; rules use the role names only (a test fails on raw colours outside the token blocks).
 
-| Role                       | Use                                                                          | Light                 | Dark                  |
-| -------------------------- | ---------------------------------------------------------------------------- | --------------------- | --------------------- |
-| `--bg`                     | page and composer ground                                                     | `#ecebe4`             | `#0d1b24`             |
-| `--surface`                | header, drawer head, input, tables                                           | `#f6f5f0`             | `#14262f`             |
-| `--text`                   | body text                                                                    | `#14262f`             | `#e4e9e6`             |
-| `--muted`                  | secondary text, interim status                                               | `#55656c`             | `#92a4ac`             |
-| `--line`                   | hairline rules and borders                                                   | `#d3d2c8`             | `#25404f`             |
-| `--edge`                   | input field boundary (3:1 against the ground)                                | `#7b878d`             | `#557382`             |
-| `--accent`                 | send, focus ring, secondary actions, active row bar                          | `#1f4e6b`             | `#78aacb`             |
-| `--on-accent`              | text and icons on accent                                                     | `#f6f5f0`             | `#0d1b24`             |
-| `--mine` / `--on-mine`     | the person's message block                                                   | `#1f4e6b` / `#f3f6f7` | `#1d4560` / `#eaf1f4` |
-| `--olive` / `--olive-bg`   | positive, "on plan" semantic only (`.on-plan`, not wired to any content yet) | `#4a5a31` / `#e1e6d3` | `#aebb86` / `#22301f` |
-| `--gold`                   | the sun mark in the header, nowhere else                                     | `#9c7a2c`             | `#d6b360`             |
-| `--danger` / `--on-danger` | offline banner, error note, Delete and Delete all; nothing else              | `#a8341f` / `#fbf8f2` | `#f0846f` / `#0d1b24` |
-| `--shadow`                 | the drawer's only shadow                                                     | translucent ink       | translucent black     |
-| `--scrim`                  | dimming layer behind the open drawer                                         | translucent ink       | translucent black     |
+| Role                       | Use                                                             | Light                 | Dark                  |
+| -------------------------- | --------------------------------------------------------------- | --------------------- | --------------------- |
+| `--bg`                     | page and composer ground                                        | `#ecebe4`             | `#0d1b24`             |
+| `--surface`                | header, drawer head, input, tables                              | `#f6f5f0`             | `#14262f`             |
+| `--text`                   | body text                                                       | `#14262f`             | `#e4e9e6`             |
+| `--muted`                  | secondary text, interim status                                  | `#55656c`             | `#92a4ac`             |
+| `--line`                   | hairline rules and borders                                      | `#d3d2c8`             | `#25404f`             |
+| `--edge`                   | input field boundary (3:1 against the ground)                   | `#7b878d`             | `#557382`             |
+| `--accent`                 | send, focus ring, secondary actions, active row bar             | `#1f4e6b`             | `#78aacb`             |
+| `--on-accent`              | text and icons on accent                                        | `#f6f5f0`             | `#0d1b24`             |
+| `--mine` / `--on-mine`     | the person's message block                                      | `#1f4e6b` / `#f3f6f7` | `#1d4560` / `#eaf1f4` |
+| `--gold`                   | the sun mark in the header, nowhere else                        | `#9c7a2c`             | `#d6b360`             |
+| `--danger` / `--on-danger` | offline banner, error note, Delete and Delete all; nothing else | `#a8341f` / `#fbf8f2` | `#f0846f` / `#0d1b24` |
+| `--shadow`                 | the drawer's only shadow                                        | translucent ink       | translucent black     |
+| `--scrim`                  | dimming layer behind the open drawer                            | translucent ink       | translucent black     |
 
-Measured contrast (WCAG): text on ground 13.0 (light) and 14.3 (dark); muted on ground 5.1 and 6.8; on-mine on mine 8.2 and 8.9; on-accent on accent 8.2 and 7.0; accent on ground 7.4 and 7.0; on-danger on danger 6.2 and 6.9; olive on olive-bg 5.9 and 6.8; sun mark on surface 3.7 (light) and 7.8 (dark); input edge on ground 3.1 and 3.5.
+Measured contrast (WCAG): text on ground 13.0 (light) and 14.3 (dark); muted on ground 5.1 and 6.8; on-mine on mine 8.2 and 8.9; on-accent on accent 8.2 and 7.0; accent on ground 7.4 and 7.0; on-danger on danger 6.2 and 6.9; sun mark on surface 3.7 (light) and 7.8 (dark); input edge on ground 3.1 and 3.5.
 
 ## Type
 
@@ -52,7 +51,7 @@ Measured contrast (WCAG): text on ground 13.0 (light) and 14.3 (dark); muted on 
 
 ## Dark mode
 
-A designed second set, not an inversion: a deep sea-blue ground, lighter accent, and olive and gold re-tuned for contrast on the dark ground. It follows the OS preference (`prefers-color-scheme`); there is no switch. `theme-color` has light and dark variants; the manifest carries one light `theme_color` and the dark `background_color` for the splash.
+A designed second set, not an inversion: a deep sea-blue ground, lighter accent, and gold re-tuned for contrast on the dark ground. It follows the OS preference (`prefers-color-scheme`); there is no switch. `theme-color` has light and dark variants; the manifest carries one light `theme_color` and the dark `background_color` for the splash.
 
 ## Home-screen icon
 

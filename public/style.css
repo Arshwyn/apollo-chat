@@ -42,8 +42,6 @@
   --on-accent: #f6f5f0;
   --mine: #1f4e6b;
   --on-mine: #f3f6f7;
-  --olive: #4a5a31;
-  --olive-bg: #e1e6d3;
   --gold: #9c7a2c;
   --danger: #a8341f;
   --on-danger: #fbf8f2;
@@ -87,8 +85,6 @@
     --on-accent: #0d1b24;
     --mine: #1d4560;
     --on-mine: #eaf1f4;
-    --olive: #aebb86;
-    --olive-bg: #22301f;
     --gold: #d6b360;
     --danger: #f0846f;
     --on-danger: #0d1b24;
@@ -354,15 +350,6 @@ button:disabled {
   max-width: var(--measure);
   color: var(--muted);
   font: italic 400 0.9rem / 1.4 var(--font-display);
-}
-/* Positive "on plan" semantic. Not wired to any content yet; olive appears nowhere else. */
-.on-plan {
-  display: inline-block;
-  padding: 5px 9px;
-  border-radius: var(--radius-pill);
-  background: var(--olive-bg);
-  color: var(--olive);
-  font: 600 0.78rem / 1 var(--font-body);
 }
 #composer {
   padding: 10px var(--space-3) calc(var(--space-3) + env(safe-area-inset-bottom));
