@@ -81,6 +81,9 @@ test('service worker never touches /api/ and only handles shell GETs', async () 
   assert.equal(fire('/api/conversations'), null);
   assert.equal(fire('/api/photos', { method: 'POST' }), null);
   assert.equal(fire('/api/conversations/x/messages'), null);
+  assert.equal(fire('/api/dayfiles'), null);
+  assert.equal(fire('/api/dayfiles?before=2026-11-05&limit=30'), null);
+  assert.equal(fire('/api/dayfiles/2026-11-05/day.md'), null);
   assert.equal(fire('/something-else.js'), null);
   assert.ok(fire('/style.css'));
   assert.ok(fire('/', { mode: 'navigate' }));
@@ -89,6 +92,13 @@ test('service worker never touches /api/ and only handles shell GETs', async () 
     puts.every((k) => !k.startsWith('/api')),
     'nothing under /api is cached',
   );
+});
+
+test('the Daily logs module is precached and no day-file URL is in the shell list', () => {
+  const src = read('public/sw.js');
+  const shell = /const SHELL = \[([\s\S]*?)\];/.exec(src)[1];
+  assert.match(shell, /'\/js\/dayfiles.js'/);
+  assert.equal(/dayfile/.test(shell.replace('/js/dayfiles.js', '')), false);
 });
 
 test('service worker source has no cache rule for the API', () => {
@@ -114,7 +124,7 @@ test('every @font-face url in style.css is precached by the worker and exists on
     assert.ok(entries.includes(u), `${u} is in SHELL`);
     assert.ok(fs.existsSync(new URL(`../public${u}`, import.meta.url)), `${u} exists`);
   }
-  assert.match(read('public/sw.js'), /apollo-shell-v3/);
+  assert.match(read('public/sw.js'), /apollo-shell-v4/);
 });
 
 test('every script module under public/js is in the precached app shell', () => {
