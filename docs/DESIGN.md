@@ -8,7 +8,7 @@ A private coaching chat used on a phone, one-handed, often in short sessions (a 
 
 ## Mood and direction
 
-Aegean blue and limestone: a pale warm stone ground, deep sea blue for action and the person's own messages, ink-dark text. The coach speaks in serif prose straight on the page, with no bubble, like a letter. The person's messages are small sans-serif blocks on the right. A single gold sun in the header is the only decoration.
+Aegean blue and limestone: a pale warm stone ground, deep sea blue for action and the person's own messages, ink-dark text. The coach speaks in serif prose straight on the page, with no bubble, like a letter. The person's messages are small sans-serif blocks on the right. A gold laurel wreath around an A in the header is the only decoration.
 
 ## Palette roles
 
@@ -25,12 +25,12 @@ Both sets are defined once as CSS custom properties; rules use the role names on
 | `--accent`                 | send, focus ring, secondary actions, active row bar             | `#1f4e6b`             | `#78aacb`             |
 | `--on-accent`              | text and icons on accent                                        | `#f6f5f0`             | `#0d1b24`             |
 | `--mine` / `--on-mine`     | the person's message block                                      | `#1f4e6b` / `#f3f6f7` | `#1d4560` / `#eaf1f4` |
-| `--gold`                   | the sun mark in the header, nowhere else                        | `#9c7a2c`             | `#d6b360`             |
+| `--gold`                   | the laurel wreath in the header mark, nowhere else              | `#9c7a2c`             | `#d6b360`             |
 | `--danger` / `--on-danger` | offline banner, error note, Delete and Delete all; nothing else | `#a8341f` / `#fbf8f2` | `#f0846f` / `#0d1b24` |
 | `--shadow`                 | the drawer's only shadow                                        | translucent ink       | translucent black     |
 | `--scrim`                  | dimming layer behind the open drawer                            | translucent ink       | translucent black     |
 
-Measured contrast (WCAG): text on ground 13.0 (light) and 14.3 (dark); muted on ground 5.1 and 6.8; on-mine on mine 8.2 and 8.9; on-accent on accent 8.2 and 7.0; accent on ground 7.4 and 7.0; on-danger on danger 6.2 and 6.9; sun mark on surface 3.7 (light) and 7.8 (dark); input edge on ground 3.1 and 3.5.
+Measured contrast (WCAG): text on ground 13.0 (light) and 14.3 (dark); muted on ground 5.1 and 6.8; on-mine on mine 8.2 and 8.9; on-accent on accent 8.2 and 7.0; accent on ground 7.4 and 7.0; on-danger on danger 6.2 and 6.9; laurel wreath on surface 3.7 (light) and 7.8 (dark); the A on surface 14.3 and 12.7; input edge on ground 3.1 and 3.5.
 
 ## Type
 
@@ -53,7 +53,7 @@ Measured contrast (WCAG): text on ground 13.0 (light) and 14.3 (dark); muted on 
 
 A read-only screen that takes the place of the message list and composer, reached from the "Daily logs" button in the chats drawer (the same secondary-button style as "Copy conversation", above the destructive action). It adds no new identity: it reuses the existing roles and type.
 
-- **Header:** the sun mark and the title "Daily logs"; a back arrow (the icon-button style of the menu button) replaces the menu and new-chat buttons while it is open. Back, Escape and the phone's back gesture each go one step back (day, then list, then chat). The chat, its draft and any running reply are untouched underneath.
+- **Header:** the A-in-laurel mark and the title "Daily logs"; a back arrow (the icon-button style of the menu button) replaces the menu and new-chat buttons while it is open. Back, Escape and the phone's back gesture each go one step back (day, then list, then chat). The chat, its draft and any running reply are untouched underneath.
 - **Dates:** rows with a hairline underline; the date label (weekday, day, month, plus the year when it is not the current one) is Literata, the file count is small muted Public Sans. "Load older" is the existing secondary button.
 - **A day:** the date as a Literata heading; when there is more than one file, pill buttons named by file (without `.md`) switch between them (pressed = filled accent, others outlined accent, as the secondary buttons elsewhere); a single file opens directly. The text is rendered with the chat renderer inside a `.msg.apollo` container, so headings, bullets, bold and tables look as in a reply. Prose keeps the reading measure; a table may use the whole column.
 - **Tables on a phone:** tables keep their frame and scroll sideways inside it (checked at 390 and 320 wide: the page does not widen, and the first column is fully readable before scrolling). A sticky first column was considered and not used: it would take about half of a 390px frame and leave little room for the other columns, so the plain scroll is easier to read.
@@ -66,4 +66,4 @@ A designed second set, not an inversion: a deep sea-blue ground, lighter accent,
 
 ## Home-screen icon
 
-`npm run icons` draws a gold sun on the accent blue (`scripts/make-icons.mjs`). The colours there mirror `--accent` and the dark gold.
+`npm run icons` draws a gold laurel wreath and a light A on the accent blue (`scripts/make-icons.mjs`). The A is the capital A of Literata (SIL OFL), traced once from the font file into a single path that the header mark shares. The colours there mirror `--accent`, the dark gold and the dark text; the maskable and apple-touch icons keep the whole wreath inside the central 60%.
