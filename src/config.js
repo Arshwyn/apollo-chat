@@ -4,6 +4,10 @@ import { fileURLToPath } from 'node:url';
 export const USER_ID = /^[a-z][a-z0-9_]{1,19}$/;
 const APP_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
+export const DEFAULT_MAX_PHOTOS = 8;
+// The gateway keeps its own ceiling of the same value (gateway/gateway.mjs); both change together.
+export const MAX_PHOTOS_CEILING = 16;
+
 export class ConfigError extends Error {}
 
 function int(env, key, def, { min = 1, max = Number.MAX_SAFE_INTEGER } = {}) {
@@ -73,6 +77,7 @@ export function loadConfig(env = process.env, { appDir = APP_DIR } = {}) {
     runTimeoutMs: int(env, 'RUN_TIMEOUT_MS', 300_000, { min: 1000 }),
     maxRuns: int(env, 'MAX_RUNS', 2),
     rateLimitPerHour: int(env, 'RATE_LIMIT_PER_HOUR', 30),
+    maxPhotosPerMessage: int(env, 'MAX_PHOTOS_PER_MESSAGE', DEFAULT_MAX_PHOTOS, { max: MAX_PHOTOS_CEILING }),
     photoTtlHours: int(env, 'PHOTO_TTL_HOURS', 24),
     stagedPhotoTtlMinutes: int(env, 'STAGED_PHOTO_TTL_MINUTES', 60),
     replayTurns: int(env, 'REPLAY_TURNS', 20, { max: 100 }),

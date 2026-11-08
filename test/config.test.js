@@ -46,3 +46,11 @@ test('rejects bad USERS, time zone and numbers', () => {
   assert.throws(() => loadConfig({ ...base, TZ_NAME: 'Not/AZone' }), ConfigError);
   assert.throws(() => loadConfig({ ...base, MAX_RUNS: '0' }), ConfigError);
 });
+
+test('MAX_PHOTOS_PER_MESSAGE defaults to 8 and is validated between 1 and 16', () => {
+  assert.equal(loadConfig(base).maxPhotosPerMessage, 8);
+  assert.equal(loadConfig({ ...base, MAX_PHOTOS_PER_MESSAGE: '2' }).maxPhotosPerMessage, 2);
+  assert.equal(loadConfig({ ...base, MAX_PHOTOS_PER_MESSAGE: '16' }).maxPhotosPerMessage, 16);
+  for (const bad of ['0', '17', '-1', '2.5', 'many'])
+    assert.throws(() => loadConfig({ ...base, MAX_PHOTOS_PER_MESSAGE: bad }), ConfigError, bad);
+});

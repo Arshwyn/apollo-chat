@@ -14,6 +14,7 @@ export function testConfig(dataDir, extra = {}) {
     memoryRoot: '/path/to/memory',
     maxRuns: 2,
     rateLimitPerHour: 30,
+    maxPhotosPerMessage: 8,
     photoTtlHours: 24,
     stagedPhotoTtlMinutes: 60,
     replayTurns: 20,
