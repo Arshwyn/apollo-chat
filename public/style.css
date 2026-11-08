@@ -499,11 +499,13 @@ button:disabled {
 #chat-list .small.danger {
   color: var(--danger);
 }
+#open-logs,
 #copy-chat,
 #delete-all {
   margin: 0 var(--space-4);
   min-height: 44px;
 }
+#open-logs,
 #copy-chat {
   margin-top: var(--space-2);
 }
@@ -512,6 +514,91 @@ button:disabled {
   margin-bottom: calc(var(--space-5) + env(safe-area-inset-bottom));
   color: var(--danger);
   border-color: color-mix(in srgb, var(--danger) 45%, var(--line));
+}
+/* Daily logs: a read-only screen in place of the chat. Dates are rows (display serif, count in muted sans);
+   a day's text reuses the chat's .msg rules, so headings, bullets and tables match. */
+#logs {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-4) 18px var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+#logs > *,
+.log-day > * {
+  width: 100%;
+  max-width: var(--measure);
+  min-width: 0;
+}
+.log-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.log-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-3);
+  width: 100%;
+  min-height: 52px;
+  padding: 0 var(--space-1);
+  text-align: left;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+}
+.log-row .when {
+  font: 500 var(--text-l) / 1.3 var(--font-display);
+}
+.log-row .count {
+  flex: none;
+  color: var(--muted);
+  font: 400 var(--text-s) / 1.3 var(--font-body);
+}
+#logs .older {
+  align-self: flex-start;
+}
+.log-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+.log-day,
+#logs > .log-day {
+  max-width: none;
+}
+.log-day {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.day-title {
+  margin: 0;
+  font: 600 var(--text-title) / 1.3 var(--font-display);
+}
+/* Prose keeps the reading measure; a table may use the whole column before it scrolls. */
+.log-day > .day-text {
+  max-width: none;
+}
+.day-text .body > :not(.table-wrap) {
+  max-width: var(--measure);
+}
+.file-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+.file-tab {
+  border-color: var(--accent);
+  color: var(--accent);
+  font-weight: 600;
+  border-radius: var(--radius-pill);
+}
+.file-tab[aria-pressed='true'] {
+  background: var(--accent);
+  color: var(--on-accent);
 }
 /* Select-all and long-press select only message text, not buttons, header or the rest of the chrome. */
 #app {

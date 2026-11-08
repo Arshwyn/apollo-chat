@@ -2,6 +2,7 @@ import { api, ApiError } from './api.js';
 import { messageEl, renderBody, turnEl } from './render.js';
 import { conversationToText, copyText } from './copy.js';
 import { createDrawer } from './drawer.js';
+import { createDailyLogs } from './dayfiles.js';
 import { createStagedPhotos } from './staged.js';
 
 // Photo limits come from the server (GET /api/me) so there is one place to change them.
@@ -29,6 +30,43 @@ const drawer = createDrawer({
   opener: $('menu-btn'),
   closeButton: $('close-drawer'),
   background: ['bar', 'offline', 'messages', 'status', 'composer'].map($),
+});
+
+// The Daily logs screen takes the place of the message list and composer; the chat, its draft and any running
+// reply are left as they are underneath.
+let hiddenBefore = [];
+const chatParts = ['messages', 'status', 'composer'].map($);
+const logs = createDailyLogs({
+  root: $('logs'),
+  api,
+  chrome: {
+    show() {
+      hiddenBefore = chatParts.map((e) => e.hidden);
+      for (const e of chatParts) e.hidden = true;
+      els.title.hidden = true;
+      $('logs-title').hidden = false;
+      $('logs').hidden = false;
+      $('menu-btn').hidden = true;
+      $('new-btn').hidden = true;
+      $('back-btn').hidden = false;
+    },
+    hide() {
+      chatParts.forEach((e, i) => (e.hidden = hiddenBefore[i]));
+      els.title.hidden = false;
+      $('logs-title').hidden = true;
+      $('logs').hidden = true;
+      $('back-btn').hidden = true;
+      $('menu-btn').hidden = false;
+      $('new-btn').hidden = false;
+      $('menu-btn').focus();
+    },
+    focusBack: () => $('back-btn').focus(),
+  },
+});
+$('back-btn').addEventListener('click', () => logs.back());
+$('open-logs').addEventListener('click', () => {
+  drawer.close();
+  logs.open();
 });
 
 const staged = createStagedPhotos({ api });
