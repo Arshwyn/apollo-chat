@@ -149,3 +149,54 @@ export function listDays(cfg, { user, limit, before }) {
   }
   return days;
 }
+
+// One day file's text. Every level under the history folder must be a real directory and the file a regular
+// file (links are refused even when they resolve inside), the path must still resolve inside the history
+// folder, and the file is opened without following links and compared to what was checked.
+export function readDayfile(cfg, { user, date, name }) {
+  const root = historyRoot(cfg, user);
+  if (!root) throw new DayfileError('not_found');
+  const { year, month, day } = parseDate(date);
+  const dirs = [path.join(root, year), path.join(root, year, month), path.join(root, year, month, day)];
+  for (const d of dirs) {
+    const st = lstatOrNull(d);
+    if (!st) throw new DayfileError('not_found');
+    if (!st.isDirectory()) throw new DayfileError('not_found');
+  }
+  const file = path.join(dirs[2], name);
+  const lst = lstatOrNull(file);
+  if (!lst || !lst.isFile()) throw new DayfileError('not_found');
+  let real;
+  try {
+    real = fs.realpathSync(file);
+  } catch {
+    throw new DayfileError('not_found');
+  }
+  if (real !== file || !real.startsWith(root + path.sep)) throw new DayfileError('not_found');
+  let fd;
+  try {
+    fd = fs.openSync(file, fs.constants.O_RDONLY | fs.constants.O_NOFOLLOW | fs.constants.O_NONBLOCK);
+  } catch {
+    throw new DayfileError('not_found');
+  }
+  try {
+    const st = fs.fstatSync(fd);
+    if (!st.isFile() || st.ino !== lst.ino || st.dev !== lst.dev) throw new DayfileError('not_found');
+    if (st.size > MAX_DAYFILE_BYTES) throw new DayfileError('too_large');
+    const buf = Buffer.alloc(MAX_DAYFILE_BYTES + 1);
+    let n = 0;
+    for (;;) {
+      const got = fs.readSync(fd, buf, n, buf.length - n, null);
+      if (got === 0) break;
+      n += got;
+      if (n > MAX_DAYFILE_BYTES) throw new DayfileError('too_large');
+    }
+    try {
+      return new TextDecoder('utf-8', { fatal: true }).decode(buf.subarray(0, n));
+    } catch {
+      throw new DayfileError('invalid');
+    }
+  } finally {
+    fs.closeSync(fd);
+  }
+}
