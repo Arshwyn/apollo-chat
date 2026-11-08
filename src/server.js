@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { HttpError } from './errors.js';
 import { UUID, removeRunDir, removeTranscript, removeUserFiles } from './files.js';
+import { MAX_IMAGE_BYTES } from './images.js';
 
 const PUBLIC_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'public');
 const MIME = {
@@ -160,7 +161,14 @@ function ownConversation(stores, user, id) {
 function coreRoutes({ config, stores, isBusy }) {
   const dataDir = config.dataDir;
   return [
-    ['GET', '/api/me', ({ user }) => ({ user })],
+    [
+      'GET',
+      '/api/me',
+      ({ user }) => ({
+        user,
+        limits: { maxPhotos: config.maxPhotosPerMessage, maxPhotoBytes: MAX_IMAGE_BYTES },
+      }),
+    ],
     [
       'GET',
       '/api/conversations',

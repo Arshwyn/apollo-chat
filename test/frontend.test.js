@@ -147,3 +147,12 @@ test('the renderer never uses innerHTML or other HTML sinks', async () => {
     assert.doesNotMatch(code, /innerHTML|outerHTML|insertAdjacentHTML|document\.write/);
   }
 });
+
+test('the composer takes its photo limits from the server, with no count or byte size of its own', async () => {
+  const fs = await import('node:fs');
+  const src = fs.readFileSync(new URL('../public/js/app.js', import.meta.url), 'utf8');
+  assert.match(src, /limits\.maxPhotos/);
+  assert.match(src, /limits\.maxPhotoBytes/);
+  assert.doesNotMatch(src, /\bMAX_PHOTOS\b|\bMAX_BYTES\b|10 \* 1024/);
+  assert.doesNotMatch(src, /\b(?:at most|larger than) \d/i);
+});
