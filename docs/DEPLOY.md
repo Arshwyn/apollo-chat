@@ -38,6 +38,8 @@ docker compose up -d --build
 
 Compose bind-mounts `DATA_DIR` and `GATEWAY_SOCKET_DIR` at the same absolute path as on the host and runs the container read-only with no capabilities. The socket directory (not the socket file) is mounted, so the app reconnects by itself after the gateway restarts; the client retries the connect with backoff.
 
+Node versions: everything supports Node 20 or newer (`engines`); the container image runs Node 24 and the host gateway needs only Node 20.
+
 ## What needs a restart
 
 | Change                                                    | Restart                             |

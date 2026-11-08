@@ -71,7 +71,7 @@ npm run icons   # regenerate public/icons
 
 Run locally: `node --env-file=.env src/index.js` (the app needs a reachable gateway socket to answer messages). The test suite uses a fake `claude` script, so no real data or model is involved. The hook tests read `APOLLO_HOOK_PATH`; `npm test` points it at the proposed hook in `docs/host/`, and the host operator re-runs it against the installed hook (see `docs/HOOK.md`).
 
-The app targets Node 24 in the container and also runs on Node 20 (the gateway needs only Node 20).
+Node support: the minimum is Node 20 for everything (`engines` in `package.json`). The container image tracks a newer Node (24, pinned by digest), and the host gateway needs only Node 20 because it is dependency-free. `test/nodeSupport.test.js` guards both claims.
 
 ## Cloudflare Access
 
