@@ -124,7 +124,7 @@ test('every @font-face url in style.css is precached by the worker and exists on
     assert.ok(entries.includes(u), `${u} is in SHELL`);
     assert.ok(fs.existsSync(new URL(`../public${u}`, import.meta.url)), `${u} exists`);
   }
-  assert.match(read('public/sw.js'), /apollo-shell-v4/);
+  assert.match(read('public/sw.js'), /apollo-shell-v5/);
 });
 
 test('every script module under public/js is in the precached app shell', () => {
