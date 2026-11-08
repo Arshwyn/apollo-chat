@@ -3,6 +3,7 @@ import { StoreRegistry } from './store.js';
 import { RunManager } from './runs.js';
 import { photoRoutes } from './photos.js';
 import { chatRoutes } from './chat.js';
+import { dayfileRoutes } from './dayfiles.js';
 import { sweepPhotos, startSweeper } from './sweep.js';
 
 // Wires the pieces together. Identity and the gateway client are injected: production passes the
@@ -21,7 +22,7 @@ export function buildService({ config, authenticate, gateway, logger, now }) {
     authenticate,
     stores,
     logger,
-    routes: [...photoRoutes({ config }), ...chatRoutes({ runs })],
+    routes: [...photoRoutes({ config }), ...chatRoutes({ runs }), ...dayfileRoutes({ gateway })],
     isBusy: (user) => runs.isBusy(user),
   });
   const stopSweeper = startSweeper({
