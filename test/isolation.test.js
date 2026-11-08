@@ -114,3 +114,40 @@ test('privacy: no image bytes in either database after a photo run', async () =>
     await t.close();
   }
 });
+
+test('day files: each user reads only their own through the app and the real gateway', async () => {
+  const t = await boot();
+  try {
+    const put = (user, date, name, text) => {
+      const [y, m, d] = date.split('-');
+      const dir = path.join(t.root, 'memory', user, 'history', y, m, d);
+      fs.mkdirSync(dir, { recursive: true });
+      fs.writeFileSync(path.join(dir, name), text);
+    };
+    put('alice', '2026-11-05', 'day.md', 'ALICE-DAY');
+    put('bob', '2026-11-06', 'bobday.md', 'BOB-ONLY');
+    const list = async (u) => (await t.call(u, 'GET', '/api/dayfiles')).json();
+    assert.deepEqual(await list('alice'), {
+      days: [{ date: '2026-11-05', files: ['day.md'] }],
+      next: null,
+    });
+    assert.deepEqual((await list('bob')).days, [{ date: '2026-11-06', files: ['bobday.md'] }]);
+    const own = await t.call('alice', 'GET', '/api/dayfiles/2026-11-05/day.md');
+    assert.equal((await own.json()).text, 'ALICE-DAY');
+    for (const u of ['/api/dayfiles/2026-11-06/bobday.md', '/api/dayfiles/2026-11-05/bobday.md']) {
+      const r = await t.call('alice', 'GET', u);
+      assert.equal(r.status, 404);
+      assert.equal((await r.text()).includes('BOB-ONLY'), false);
+    }
+    assert.equal((await t.call('alice', 'GET', '/api/dayfiles/2026-11-05/day.md?user=bob')).status, 200);
+    assert.equal((await fetch(t.base + '/api/dayfiles')).status, 401);
+    // nothing in the app log names a file, date or its content
+    const logged = t.logs.map((l) => String(l).replace(/"t":"[^"]*"/, '')).join('\n');
+    assert.equal(/bobday|ALICE-DAY|BOB-ONLY|2026-11-0/.test(logged), false);
+    // a gateway restart is survived by the next request
+    await t.restartGateway();
+    assert.equal((await list('alice')).days.length, 1);
+  } finally {
+    await t.close();
+  }
+});
