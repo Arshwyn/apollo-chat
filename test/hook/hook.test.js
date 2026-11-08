@@ -574,6 +574,39 @@ test(
   },
 );
 
+test('a memory root that is itself a symlink behaves like the real root', { skip }, async () => {
+  const real = p(fx.dir, 'real-root');
+  const link = p(fx.dir, 'link-root');
+  for (const u of ['alice', 'bob']) {
+    fs.mkdirSync(p(real, u), { recursive: true });
+    fs.writeFileSync(p(real, u, 'profile.md'), `private ${u}`);
+  }
+  for (const n of SHARED) fs.writeFileSync(p(real, n), 'shared');
+  fs.symlinkSync(real, link);
+  const env = chatEnv('alice', { APOLLO_ROOT: link });
+  const verdict = async (tool, input) => (await call(env, tool, input)).decision;
+  for (const base of [link, real]) {
+    for (const n of SHARED) assert.equal(await verdict('Read', { file_path: p(base, n) }), 'allow', n);
+    assert.equal(await verdict('Grep', { pattern: 'x', path: p(base, 'persona.md') }), 'allow');
+    assert.equal(await verdict('Read', { file_path: p(base, 'alice', 'profile.md') }), 'allow');
+    assert.equal(await verdict('Read', { file_path: p(base, 'bob', 'profile.md') }), 'deny');
+    assert.equal(
+      await verdict('Read', { file_path: p(base, 'persona.md', '..', 'bob', 'profile.md') }),
+      'deny',
+    );
+    assert.equal(await verdict('Glob', { pattern: '*', path: base }), 'deny');
+    assert.equal(await verdict('Read', { file_path: p(base, 'persona.md.bak') }), 'deny');
+    assert.equal(await verdict('Write', { file_path: p(base, 'persona.md'), content: 'x' }), 'deny');
+  }
+  assert.equal(await verdict('Read', { file_path: p(link, '..', 'real-root', 'bob', 'profile.md') }), 'deny');
+  // A shared file swapped for a symlink to another user's file stays denied, through either path.
+  fs.rmSync(p(real, 'rules.md'));
+  fs.symlinkSync(p(real, 'bob', 'profile.md'), p(real, 'rules.md'));
+  assert.equal(await verdict('Read', { file_path: p(link, 'rules.md') }), 'deny');
+  assert.equal(await verdict('Read', { file_path: p(real, 'rules.md') }), 'deny');
+  assert.equal(await verdict('Read', { file_path: p(link, 'persona.md') }), 'allow');
+});
+
 test('the shared file list is configurable and only plain file names count', { skip }, async () => {
   const env = chatEnv('alice', { APOLLO_SHARED_FILES: 'rules.md ../escape sub/x.md .' });
   assert.equal((await call(env, 'Read', { file_path: p(fx.root, 'rules.md') })).decision, 'allow');
