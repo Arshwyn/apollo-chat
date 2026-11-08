@@ -69,6 +69,7 @@ export function loadGatewayConfig(env = process.env) {
     users,
     memoryRoot: env.APOLLO_MEMORY_ROOT ? need('APOLLO_MEMORY_ROOT') : null,
     runTimeoutMs: int('RUN_TIMEOUT_MS', 300_000),
+    requestTimeoutMs: int('REQUEST_TIMEOUT_MS', 10_000),
     maxRuns: int('MAX_RUNS', 2),
     killGraceMs: int('KILL_GRACE_MS', 3000),
   };
@@ -309,6 +310,12 @@ export function createGateway(cfg, { log = (o) => process.stdout.write(JSON.stri
   const server = net.createServer((sock) => {
     let data = '';
     let handled = false;
+    // A connection must deliver its request line in time; this timer never touches a run's own timeout.
+    const idle = setTimeout(() => {
+      if (!handled) sock.destroy();
+    }, cfg.requestTimeoutMs);
+    idle.unref();
+    sock.on('close', () => clearTimeout(idle));
     sock.setEncoding('utf8');
     sock.on('error', () => {});
     sock.on('data', (chunk) => {
@@ -316,12 +323,14 @@ export function createGateway(cfg, { log = (o) => process.stdout.write(JSON.stri
       data += chunk;
       if (data.length > MAX_REQUEST_BYTES) {
         handled = true;
+        clearTimeout(idle);
         send(sock, { type: 'error', code: 'too_large' });
         return sock.end();
       }
       const i = data.indexOf('\n');
       if (i < 0) return;
       handled = true;
+      clearTimeout(idle);
       let req;
       try {
         req = JSON.parse(data.slice(0, i));

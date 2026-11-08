@@ -57,7 +57,7 @@ The host clock is UTC, so dates follow the user instead. The browser sends its I
 
 Chat runs have no shell and no `/tmp`: the prompt tells the agent to skip the temp-file and mail trailer steps and not to glob without a path. A generic "That request was blocked" line is appended to a reply only when the run's last tool call was blocked or the reply text is empty; a blocked call followed by a successful one is not mentioned.
 
-The gateway has its own variables (`DATA_DIR`, `SOCKET_DIR`, `CLAUDE_BIN`, `GATEWAY_USERS`, `APOLLO_MEMORY_ROOT`, `RUN_TIMEOUT_MS`, `MAX_RUNS`); `GATEWAY_USERS` maps each user to the connector tool prefixes their runs may use.
+The gateway has its own variables (`DATA_DIR`, `SOCKET_DIR`, `CLAUDE_BIN`, `GATEWAY_USERS`, `APOLLO_MEMORY_ROOT`, `RUN_TIMEOUT_MS`, `MAX_RUNS`, `REQUEST_TIMEOUT_MS`); `GATEWAY_USERS` maps each user to the connector tool prefixes their runs may use. `REQUEST_TIMEOUT_MS` (default 10000) closes a connection that has not sent a complete request line in time; it does not affect a run's own timeout.
 
 ## Develop
 
