@@ -334,6 +334,8 @@ function addPreview(file) {
   const img = document.createElement('img');
   img.src = photo.url;
   img.alt = '';
+  // Some browsers cannot draw a HEIC thumbnail; the photo is still uploaded and converted by the server.
+  img.addEventListener('error', () => wrap.classList.add('no-preview'));
   const x = document.createElement('button');
   x.type = 'button';
   x.append(closeIcon());
