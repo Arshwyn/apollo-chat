@@ -49,6 +49,17 @@ Measured contrast (WCAG): text on ground 13.0 (light) and 14.3 (dark); muted on 
 - Targets are at least 40px, and 44px on coarse pointers (`--tap`); small glyphs keep the full target through padding. Focus is a 2px accent ring with offset on every control.
 - Mobile first: the base is the phone layout; the column is centred and capped at 760px on wide screens. Safe-area insets are kept.
 
+## Daily logs screen
+
+A read-only screen that takes the place of the message list and composer, reached from the "Daily logs" button in the chats drawer (the same secondary-button style as "Copy conversation", above the destructive action). It adds no new identity: it reuses the existing roles and type.
+
+- **Header:** the sun mark and the title "Daily logs"; a back arrow (the icon-button style of the menu button) replaces the menu and new-chat buttons while it is open. Back, Escape and the phone's back gesture each go one step back (day, then list, then chat). The chat, its draft and any running reply are untouched underneath.
+- **Dates:** rows with a hairline underline; the date label (weekday, day, month, plus the year when it is not the current one) is Literata, the file count is small muted Public Sans. "Load older" is the existing secondary button.
+- **A day:** the date as a Literata heading; when there is more than one file, pill buttons named by file (without `.md`) switch between them (pressed = filled accent, others outlined accent, as the secondary buttons elsewhere); a single file opens directly. The text is rendered with the chat renderer inside a `.msg.apollo` container, so headings, bullets, bold and tables look as in a reply. Prose keeps the reading measure; a table may use the whole column.
+- **Tables on a phone:** tables keep their frame and scroll sideways inside it (checked at 390 and 320 wide: the page does not widen, and the first column is fully readable before scrolling). A sticky first column was considered and not used: it would take about half of a 390px frame and leave little room for the other columns, so the plain scroll is easier to read.
+- **States:** one calm muted sentence each for no logs ("No daily logs yet."), an unavailable gateway or other failure ("Daily logs are not available right now."), offline ("Daily logs are not available offline."), a missing file and a file that is too large. There is no retry button; the existing offline bar still shows. Nothing from the server is displayed in these messages.
+- Colours are tokens only; targets are `--tap`; the focus ring is the global one; focus moves to the back button on opening and to the menu button on leaving.
+
 ## Dark mode
 
 A designed second set, not an inversion: a deep sea-blue ground, lighter accent, and gold re-tuned for contrast on the dark ground. It follows the OS preference (`prefers-color-scheme`); there is no switch. `theme-color` has light and dark variants; the manifest carries one light `theme_color` and the dark `background_color` for the splash.

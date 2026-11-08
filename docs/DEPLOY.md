@@ -38,15 +38,17 @@ docker compose up -d --build
 
 Compose bind-mounts `DATA_DIR` and `GATEWAY_SOCKET_DIR` at the same absolute path as on the host and runs the container read-only with no capabilities. The socket directory (not the socket file) is mounted, so the app reconnects by itself after the gateway restarts; the client retries the connect with backoff.
 
+The Daily logs screen needs the gateway and the app to match: restart the gateway unit first, then use the new app image. A running older gateway rejects the day-file requests, so the screen shows that daily logs are unavailable until it is restarted. `APOLLO_MEMORY_ROOT` must be set in the gateway's env file (it is already used for the day-file check); the container needs no new variable, mount or compose change and still cannot see the agent's memory.
+
 Node versions: everything supports Node 20 or newer (`engines`); the container image runs Node 24 and the host gateway needs only Node 20.
 
 ## What needs a restart
 
-| Change                                                    | Restart                             |
-| --------------------------------------------------------- | ----------------------------------- |
-| `gateway/gateway.mjs` or the gateway env file             | the gateway unit only               |
-| App code, `public/`, app `.env`                           | rebuild and restart the container   |
-| Agent file, rules.md, persona, memory, the isolation hook | nothing: they are read on every run |
+| Change                                                                | Restart                             |
+| --------------------------------------------------------------------- | ----------------------------------- |
+| `gateway/gateway.mjs`, `gateway/dayfiles.mjs` or the gateway env file | the gateway unit only               |
+| App code, `public/`, app `.env`                                       | rebuild and restart the container   |
+| Agent file, rules.md, persona, memory, the isolation hook             | nothing: they are read on every run |
 
 ## Acceptance checks after install (host operator)
 
