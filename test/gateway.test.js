@@ -4,7 +4,14 @@ import fs from 'node:fs';
 import net from 'node:net';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createGateway, loadGatewayConfig, toolLists, buildArgv, buildEnv } from '../gateway/gateway.mjs';
+import {
+  createGateway,
+  loadGatewayConfig,
+  toolLists,
+  buildArgv,
+  buildEnv,
+  dayfileTouched,
+} from '../gateway/gateway.mjs';
 import { tmpDir, rmDir } from './helpers.js';
 
 const FAKE_SRC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'fake-claude.mjs');
@@ -368,6 +375,26 @@ test('day-file check reports whether the history folder changed during the run',
     assert.equal(exitOf(ev).dayfile, null);
   } finally {
     await t.close();
+  }
+});
+
+test('day-file check also looks at the next year around the new year', () => {
+  const root = tmpDir();
+  try {
+    const nowMs = Date.UTC(2026, 11, 31, 23, 30);
+    const since = nowMs - 60_000;
+    assert.equal(dayfileTouched(root, 'alice', since, nowMs), false, 'nothing written');
+    const dir = path.join(root, 'alice', 'history', '2027', '01', '01');
+    fs.mkdirSync(dir, { recursive: true });
+    const file = path.join(dir, 'day.md');
+    fs.writeFileSync(file, 'x');
+    fs.utimesSync(file, new Date(nowMs + 1000), new Date(nowMs + 1000));
+    assert.equal(dayfileTouched(root, 'alice', since, nowMs), true, 'file under next year');
+    assert.equal(dayfileTouched(root, 'bob', since, nowMs), false, 'other user has no file');
+    fs.utimesSync(file, new Date(since - 3_600_000), new Date(since - 3_600_000));
+    assert.equal(dayfileTouched(root, 'alice', since, nowMs), false, 'file older than the run');
+  } finally {
+    rmDir(root);
   }
 });
 
