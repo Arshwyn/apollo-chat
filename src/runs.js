@@ -85,7 +85,13 @@ export class RunManager {
     const list = this.#checkRate(user);
     const runId = 'run-' + crypto.randomBytes(12).toString('hex');
     const zone = store.resolveZone(timeZone);
-    const photoPaths = claimPhotos({ dataDir: this.config.dataDir, user, runId, photoIds });
+    const photoPaths = claimPhotos({
+      dataDir: this.config.dataDir,
+      user,
+      runId,
+      photoIds,
+      maxPhotos: this.config.maxPhotosPerMessage,
+    });
     list.push(this.now());
     const userMessage = store.addMessage({
       conversationId,

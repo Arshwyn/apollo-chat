@@ -5,10 +5,9 @@ import { HttpError } from './errors.js';
 import { ensureUserDirs, userPaths } from './store.js';
 import { sanitizeImage, ImageError, MAX_IMAGE_BYTES } from './images.js';
 import { RUN_ID } from './files.js';
+import { DEFAULT_MAX_PHOTOS } from './config.js';
 
-export const MAX_PHOTOS_PER_MESSAGE = 4;
 export const MAX_MESSAGE_PHOTO_BYTES = 25 * 1024 * 1024;
-const MAX_PENDING = 8;
 const PHOTO_ID = /^[0-9a-f]{32}$/;
 
 export async function readBuffer(req, limit) {
@@ -24,7 +23,7 @@ export async function readBuffer(req, limit) {
 
 // Stage one sanitised photo under users/<user>/tmp/stg-<id>/. Photos are transient: they exist only
 // until the run that uses them succeeds (or the TTL sweep removes them).
-export async function stagePhoto({ dataDir, user, buffer }) {
+export async function stagePhoto({ dataDir, user, buffer, maxPhotos = DEFAULT_MAX_PHOTOS }) {
   let clean;
   try {
     clean = await sanitizeImage(buffer);
@@ -34,7 +33,7 @@ export async function stagePhoto({ dataDir, user, buffer }) {
   }
   const p = ensureUserDirs(dataDir, user);
   const pending = fs.readdirSync(p.tmp).filter((n) => n.startsWith('stg-')).length;
-  if (pending >= MAX_PENDING) throw new HttpError(429, 'too many unsent photos');
+  if (pending >= maxPhotos) throw new HttpError(429, 'too many unsent photos');
   const id = crypto.randomBytes(16).toString('hex');
   const dir = path.join(p.tmp, `stg-${id}`);
   fs.mkdirSync(dir, { mode: 0o700 });
@@ -63,10 +62,10 @@ function stagedFile(dataDir, user, id) {
 }
 
 // Move staged photos into the run directory the gateway will accept paths from.
-export function claimPhotos({ dataDir, user, runId, photoIds }) {
+export function claimPhotos({ dataDir, user, runId, photoIds, maxPhotos = DEFAULT_MAX_PHOTOS }) {
   if (!RUN_ID.test(runId)) throw new Error('invalid run id');
-  if (!Array.isArray(photoIds) || photoIds.length > MAX_PHOTOS_PER_MESSAGE) {
-    throw new HttpError(400, `at most ${MAX_PHOTOS_PER_MESSAGE} photos per message`);
+  if (!Array.isArray(photoIds) || photoIds.length > maxPhotos) {
+    throw new HttpError(400, `at most ${maxPhotos} ${maxPhotos === 1 ? 'photo' : 'photos'} per message`);
   }
   if (new Set(photoIds).size !== photoIds.length) throw new HttpError(400, 'duplicate photo');
   const staged = photoIds.map((id) => stagedFile(dataDir, user, id));
@@ -90,7 +89,12 @@ export function photoRoutes({ config }) {
       '/api/photos',
       async ({ req, user }) => {
         const buffer = await readBuffer(req, MAX_IMAGE_BYTES);
-        const id = await stagePhoto({ dataDir: config.dataDir, user, buffer });
+        const id = await stagePhoto({
+          dataDir: config.dataDir,
+          user,
+          buffer,
+          maxPhotos: config.maxPhotosPerMessage,
+        });
         return { photoId: id };
       },
     ],
