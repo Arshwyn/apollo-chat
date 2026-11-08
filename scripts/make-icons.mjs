@@ -5,6 +5,14 @@ import sharp from 'sharp';
 // Aegean palette (docs/DESIGN.md): accent blue ground, gold sun.
 const BG = '#1f4e6b';
 const SUN = '#d6b360';
+
+// Capital A outline of Literata (opsz 12, wght 400, the variable font's default instance in
+// public/fonts, SIL OFL, see OFL-Literata.txt), traced once from the font file. Units: 705 wide,
+// 700 tall, y down, baseline at y=700. The inline header mark in public/index.html uses the same
+// path (test/mark.test.js keeps them identical); fill-rule evenodd cuts the counter.
+export const A_PATH =
+  'M242 700L0 700L0 652L48 644Q66 640 74.5 630.5Q83 621 94 590L94 590L305 0L411 0L620 591Q630 616 636.5 626Q643 636 664 641L664 641L705 650L705 700L438 700L438 652L496 645Q516 642 520.5 631Q525 620 516 595L516 595L472 469L204 469L162 591Q155 611 157 625.5Q159 640 185 644L185 644L242 653L242 700M338 83L224 412L453 412L342 83L338 83';
+
 function svg(size, { maskable = false } = {}) {
   const c = size / 2;
   const scale = maskable ? 0.6 : 0.78; // maskable icons keep the motif inside the safe zone
