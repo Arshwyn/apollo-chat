@@ -130,18 +130,18 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-/* The one gold element: the sun mark. */
+/* The one gold element: the laurel wreath of the mark; the A is plain text colour. */
 .mark {
   width: 26px;
   height: 26px;
   flex: none;
   color: var(--gold);
 }
-.mark path {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 2;
-  stroke-linecap: round;
+.mark .wreath {
+  fill: currentColor;
+}
+.mark .a {
+  fill: var(--text);
 }
 button {
   font: 500 var(--text-m) / 1.2 var(--font-body);
