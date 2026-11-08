@@ -325,6 +325,29 @@ test('the rate limit applies per user per hour', async () => {
   }
 });
 
+test('retries count toward the hourly limit and rejected retries do not', async () => {
+  const t = setup(async () => ok({ code: 1 }), { rateLimitPerHour: 2 });
+  try {
+    const a = t.stores.forUser('alice').createConversation();
+    const b = t.stores.forUser('bob').createConversation();
+    await t.runs.start({ user: 'alice', conversationId: a.id, text: '1' }).done;
+    await t.runs.retry({ user: 'alice', conversationId: a.id }).done;
+    assert.throws(
+      () => t.runs.retry({ user: 'alice', conversationId: a.id }),
+      (e) => e.status === 429 && e.extra.rateLimited,
+    );
+    // Another user's budget is unaffected, and a retry with nothing to retry takes no slot.
+    await t.runs.start({ user: 'bob', conversationId: b.id, text: '1' }).done;
+    assert.throws(
+      () => t.runs.retry({ user: 'bob', conversationId: t.stores.forUser('bob').createConversation().id }),
+      (e) => e.status === 409,
+    );
+    await t.runs.retry({ user: 'bob', conversationId: b.id }).done;
+  } finally {
+    t.done();
+  }
+});
+
 test('the global cap rejects a run beyond MAX_RUNS', async () => {
   let release;
   const gate = new Promise((r) => (release = r));

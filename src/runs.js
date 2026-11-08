@@ -126,7 +126,7 @@ export class RunManager {
     const userMessage = [...turns].reverse().find((m) => m.role === 'user');
     if (!userMessage) throw new HttpError(409, 'nothing to retry');
     this.#admit(user);
-    this.#checkRate(user);
+    const list = this.#checkRate(user);
     let photoPaths = [];
     if (userMessage.photoCount > 0) {
       const dir = userMessage.runId ? runDir(this.config.dataDir, user, userMessage.runId) : null;
@@ -134,6 +134,7 @@ export class RunManager {
       if (photoPaths.length === 0) throw new HttpError(410, 'photos expired');
     }
     const zone = store.resolveZone(timeZone);
+    list.push(this.now());
     const assistantMessage = store.updateMessage(last.id, { text: '', status: 'running' });
     return this.#launch({
       user,
