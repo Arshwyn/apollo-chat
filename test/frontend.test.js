@@ -49,6 +49,37 @@ test('headings map to two display levels and keep bold', () => {
   assert.equal(blocks[4].lines.length, 2, '5 hashes and no-space hashes stay plain text');
 });
 
+test('closing hashes are dropped from a heading and padding never matters', () => {
+  const text = (src) =>
+    formatText(src)[0]
+      .parts.map((x) => x.text)
+      .join('');
+  assert.equal(text('# Title #'), 'Title');
+  assert.equal(text('## Title ###   '), 'Title');
+  assert.equal(text('# Title#'), 'Title#');
+  assert.equal(text('#   Spaced   title   '), 'Spaced   title');
+  assert.equal(text('# #'), '#');
+});
+
+test('long padded lines are parsed in linear time', () => {
+  const pad = ' '.repeat(50_000);
+  const bound = (src, check) => {
+    const t = performance.now();
+    const blocks = formatText(src);
+    const ms = performance.now() - t;
+    assert.ok(ms < 1000, `took ${ms.toFixed(0)} ms`);
+    check(blocks);
+  };
+  bound(`# Title${pad}x`, (b) => assert.equal(b[0].type, 'heading'));
+  bound(`# Title${pad}`, (b) => assert.equal(b[0].type, 'heading'));
+  bound(`# Title ####${pad}`, (b) => assert.equal(b[0].parts[0].text, 'Title'));
+  bound(`- item${pad}x`, (b) => assert.equal(b[0].type, 'ul'));
+  bound(`${pad}x`, (b) => assert.equal(b[0].type, 'p'));
+  bound(`|a|\n${pad}|${pad}x`, (b) => assert.equal(b[0].type, 'p'));
+  bound(`|a|\n|${pad}-${pad}x`, (b) => assert.equal(b[0].type, 'p'));
+  bound(`|a|\n  |---|${pad}\n| 1 |`, (b) => assert.equal(b[0].type, 'table'));
+});
+
 test('pipe tables parse into header and padded rows with bold cells', () => {
   const blocks = formatText('Intro\n\n| Day | Kcal |\n|---|:--:|\n| Mon | **2100** |\n| Tue |\n\nAfter');
   assert.deepEqual(
