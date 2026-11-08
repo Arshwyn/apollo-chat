@@ -52,7 +52,7 @@ export function buildPrompt({
   if (photoPaths.length) {
     parts.push(
       '',
-      'Attached photos are temporary and are deleted when this run ends. Read each one with the Read tool and, BEFORE replying, write what you extracted to the day file as your rules require (an `Intake:` line for food, recovery numbers, estimates marked with a range).',
+      'Attached photos are temporary: they are removed after a successful run, and in any case after the retention window if the run fails or is cancelled. Read each one with the Read tool and, BEFORE replying, write what you extracted to the day file as your rules require (an `Intake:` line for food, recovery numbers, estimates marked with a range).',
       'Attached photos:',
       ...photoPaths.map((p) => `- ${p}`),
     );
