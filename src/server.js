@@ -131,7 +131,15 @@ export function createApp({
 }
 
 function serveStatic(res, pathname, publicDir) {
-  const rel = pathname === '/' ? 'index.html' : decodeURIComponent(pathname).replace(/^\/+/, '');
+  let decoded = '/';
+  if (pathname !== '/') {
+    try {
+      decoded = decodeURIComponent(pathname);
+    } catch {
+      throw new HttpError(404, 'not found');
+    }
+  }
+  const rel = pathname === '/' ? 'index.html' : decoded.replace(/^\/+/, '');
   const file = path.resolve(publicDir, rel);
   if (!file.startsWith(publicDir + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) {
     throw new HttpError(404, 'not found');

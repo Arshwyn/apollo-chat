@@ -178,6 +178,14 @@ test('the app shell is served to authenticated users only, with safe paths and t
     assert.equal((await t.call('alice', 'GET', '/..%2Fpackage.json')).status, 404);
     assert.equal((await t.call('alice', 'GET', '/%2e%2e/package.json')).status, 404);
     assert.equal((await t.call('alice', 'GET', '/js')).status, 404);
+    for (const bad of ['/%E0%A4%A', '/%', '/%zz', '/..%2f..%2fetc%2fpasswd', '/js/%E0%A4%A.js']) {
+      const r = await t.call('alice', 'GET', bad);
+      assert.equal(r.status, 404, bad);
+      assert.deepEqual(r.json, { error: 'not found' });
+      assert.equal(r.headers.get('x-content-type-options'), 'nosniff');
+      assert.match(r.headers.get('content-security-policy'), /^default-src 'self';/);
+    }
+    assert.equal((await t.call('alice', 'GET', '/')).status, 200);
   } finally {
     await t.close();
   }
