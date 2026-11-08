@@ -374,6 +374,12 @@ button:disabled {
   border-radius: var(--radius-s);
   border: 1px solid var(--line);
 }
+.preview img {
+  background: var(--surface);
+}
+.preview.no-preview img {
+  visibility: hidden;
+}
 .preview.uploading img {
   opacity: 0.4;
 }
