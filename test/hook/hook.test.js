@@ -478,6 +478,48 @@ test('APOLLO_USER alone (no chat flag) never overrides the lock', { skip }, asyn
 });
 
 test(
+  'apollo agent without the chat-run marker and without a valid lock: every tool is denied',
+  { skip },
+  async () => {
+    const lock = path.join(fx.root, '.active-user');
+    const env = BASE_ENV();
+    const calls = [
+      ['Read', { file_path: mem('alice') }],
+      ['Read', { file_path: p(fx.root, 'persona.md') }],
+      ['Bash', { command: 'ls' }],
+      ['Agent', { subagent_type: 'Explore', prompt: 'look around' }],
+      ['WebSearch', { query: 'x' }],
+      ['mcp__claude_ai_Oura__get_daily_sleep', {}],
+    ];
+    for (const content of [null, '', 'nobody\n']) {
+      try {
+        if (content !== null) fs.writeFileSync(lock, content);
+        for (const [tool, input] of calls) {
+          const r = await call(env, tool, input);
+          assert.equal(r.decision, 'deny', `lock ${JSON.stringify(content)}: ${tool}`);
+        }
+        // Other agent types are unaffected.
+        for (const agent of ['Explore', '']) {
+          const r = await call(env, 'Bash', { command: 'ls' }, { agent });
+          assert.equal(r.decision, 'allow', `agent ${JSON.stringify(agent)}`);
+        }
+      } finally {
+        fs.rmSync(lock, { force: true });
+      }
+    }
+    // A valid lock behaves as before.
+    try {
+      fs.writeFileSync(lock, 'alice\n');
+      assert.equal((await call(env, 'Read', { file_path: mem('alice') })).decision, 'allow');
+      assert.equal((await call(env, 'Bash', { command: 'ls' })).decision, 'allow');
+      assert.equal((await call(env, 'Read', { file_path: mem('bob') })).decision, 'deny');
+    } finally {
+      fs.rmSync(lock, { force: true });
+    }
+  },
+);
+
+test(
   'orchestrator flow is unchanged: lock-based, other agents unrestricted, spawn guard intact',
   { skip },
   async () => {

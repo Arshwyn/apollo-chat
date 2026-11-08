@@ -152,6 +152,12 @@ refs_of() {
 }
 others_of() { local u; for u in $APOLLO_USERS; do [ "$u" = "$1" ] || printf '%s\n' "$u"; done; }
 
+# An apollo agent with no chat-run marker and no valid lock does not know whose data it serves: every tool
+# call is denied, not only connectors and user-folder mentions.
+if [ "$agent" = apollo ] && ! is_user "$active"; then
+  deny "apollo-isolation: no active user lock; refusing every tool."
+fi
+
 # Spawn of an apollo run by the orchestrator: the prompt must not carry another user's paths.
 if [ "$tool" = Agent ]; then
   [ "$(jq -r '.tool_input.subagent_type // empty' <<<"$in")" = apollo ] || exit 0
@@ -164,15 +170,7 @@ fi
 
 [ "$agent" = apollo ] || exit 0
 
-if is_user "$active"; then
-  me=$active
-else
-  case "$tool" in mcp__*) deny "apollo-isolation: no active user lock; refusing connector access.";; esac
-  for o in $APOLLO_USERS; do
-    mentions_user "$o" && deny "apollo-isolation: no active user lock; refusing user data access."
-  done
-  exit 0
-fi
+me=$active
 
 # Connectors: only the active user's own (Gmail, Calendar, Drive, Docs and every other connector are denied).
 case "$tool" in
