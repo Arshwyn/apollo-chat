@@ -57,8 +57,8 @@ const BASE_ENV = () => ({
   PATH: process.env.PATH,
   APOLLO_ROOT: fx.root,
   APOLLO_USERS: 'alice bob',
-  APOLLO_CONNECTORS_alice: 'mcp__*Onyx*Alice* mcp__*Oura*',
-  APOLLO_CONNECTORS_bob: 'mcp__*Onyx*Bob*',
+  APOLLO_CONNECTORS_alice: 'mcp__claude_ai_Onyx_-_Alice__* mcp__claude_ai_Oura__*',
+  APOLLO_CONNECTORS_bob: 'mcp__claude_ai_Onyx_-_Bob__*',
 });
 const chatEnv = (user, extra = {}) => ({
   ...BASE_ENV(),
@@ -294,6 +294,9 @@ const deniedFor = (me, other) => {
     ['Grep glob filter absolute', 'Grep', { pattern: 'x', path: mine, glob: '/etc/*' }],
     // connectors
     ['other Onyx connector', 'mcp__claude_ai_Onyx_-_' + cap(other) + '__get_user_settings', {}],
+    ['connector with the name only in the middle (Oura)', 'mcp__other_Oura_proxy__x', {}],
+    ['connector with the other user name in the middle', 'mcp__evil__Onyx_-_' + cap(me) + '__x', {}],
+    ['connector with a prefix before the name', 'xmcp__claude_ai_Oura__x', {}],
     ['Gmail', 'mcp__claude_ai_Gmail__search_threads', {}],
     ['Drive', 'mcp__claude_ai_Google_Drive__search_files', {}],
     // tools not on the list
@@ -335,7 +338,7 @@ test(
         'allow',
       );
       // A connector glob still matches by pattern, not by files in the working directory.
-      const env2 = chatEnv('alice', { APOLLO_CONNECTORS_alice: 'mcp__*Oura*' });
+      const env2 = chatEnv('alice', { APOLLO_CONNECTORS_alice: 'mcp__claude_ai_Oura__*' });
       assert.equal((await call(env2, 'mcp__Gmail__x', {}, { cwd })).decision, 'deny');
       assert.equal((await call(env2, 'mcp__claude_ai_Oura__get', {}, { cwd })).decision, 'allow');
     } finally {
