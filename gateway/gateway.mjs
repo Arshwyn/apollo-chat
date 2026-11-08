@@ -169,11 +169,11 @@ function walkNewest(dir, depth = 0) {
   return newest;
 }
 
-// True when a file under <memoryRoot>/<user>/history/<year>/ was written at or after `sinceMs`.
+// True when a file under <memoryRoot>/<user>/history/<year>/ (UTC year, the year before and after) was written at or after `sinceMs`.
 export function dayfileTouched(memoryRoot, user, sinceMs, nowMs = Date.now()) {
   if (!memoryRoot) return null;
   const year = new Date(nowMs).getUTCFullYear();
-  for (const y of [year, year - 1]) {
+  for (const y of [year, year - 1, year + 1]) {
     const newest = walkNewest(path.join(memoryRoot, user, 'history', String(y)));
     if (newest >= sinceMs - 1000) return true;
   }
