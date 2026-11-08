@@ -13,7 +13,10 @@ test('health is open, everything else needs identity', async () => {
     assert.equal((await t.call(null, 'GET', '/api/conversations')).status, 401);
     assert.equal((await t.call(null, 'GET', '/')).status, 401);
     assert.equal((await t.call('mallory', 'GET', '/api/conversations')).status, 403);
-    assert.deepEqual((await t.call('alice', 'GET', '/api/me')).json, { user: 'alice' });
+    assert.deepEqual((await t.call('alice', 'GET', '/api/me')).json, {
+      user: 'alice',
+      limits: { maxPhotos: 8, maxPhotoBytes: 10 * 1024 * 1024 },
+    });
   } finally {
     await t.close();
   }
@@ -211,6 +214,15 @@ test('creating a conversation ignores unparseable bodies but not oversized ones'
     const tz = await t.call('bob', 'POST', '/api/conversations', { timeZone: 'Pacific/Kiritimati' });
     assert.equal(tz.status, 200);
     assert.equal(tz.json.title, '2026-11-06');
+  } finally {
+    await t.close();
+  }
+});
+
+test('/api/me reports the configured photo limit', async () => {
+  const t = await startApp({ configExtra: { maxPhotosPerMessage: 3 } });
+  try {
+    assert.equal((await t.call('alice', 'GET', '/api/me')).json.limits.maxPhotos, 3);
   } finally {
     await t.close();
   }

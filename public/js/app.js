@@ -4,8 +4,8 @@ import { conversationToText, copyText } from './copy.js';
 import { createDrawer } from './drawer.js';
 import { createStagedPhotos } from './staged.js';
 
-const MAX_PHOTOS = 4;
-const MAX_BYTES = 10 * 1024 * 1024;
+// Photo limits come from the server (GET /api/me) so there is one place to change them.
+let limits = null;
 const $ = (id) => document.getElementById(id);
 const els = {
   title: $('title'),
@@ -358,10 +358,18 @@ function addPreview(file) {
 
 els.attach.addEventListener('click', () => els.file.click());
 els.file.addEventListener('change', () => {
+  if (!limits) {
+    els.file.value = '';
+    return note('Photos are not ready yet. Try again in a moment.', 'err');
+  }
   for (const file of els.file.files) {
-    if (staged.count() >= MAX_PHOTOS) return note(`At most ${MAX_PHOTOS} photos per message.`, 'err');
-    if (file.size > MAX_BYTES) {
-      note('That photo is larger than 10 MB.', 'err');
+    if (staged.count() >= limits.maxPhotos)
+      return note(
+        `At most ${limits.maxPhotos} ${limits.maxPhotos === 1 ? 'photo' : 'photos'} per message.`,
+        'err',
+      );
+    if (file.size > limits.maxPhotoBytes) {
+      note(`That photo is larger than ${Math.round(limits.maxPhotoBytes / (1024 * 1024))} MB.`, 'err');
       continue;
     }
     addPreview(file);
@@ -398,7 +406,7 @@ syncOnline();
 
 (async function init() {
   try {
-    await api.me();
+    limits = (await api.me()).limits;
     await loadConversations();
     if (state.convs.length) await openConversation(state.convs[0].id);
     else await newConversation();
