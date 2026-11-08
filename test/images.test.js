@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import sharp from 'sharp';
 import { detectType, sanitizeImage, ImageError } from '../src/images.js';
 
@@ -72,7 +73,7 @@ test('long edge is capped at 2000 px, small images are not enlarged', async () =
   assert.equal((await sharp((await sanitizeImage(small)).buffer).metadata()).width, 100);
 });
 
-test('png stays png, webp becomes jpeg, junk and heic are rejected with 415', async () => {
+test('png stays png, webp becomes jpeg, junk is rejected with 415', async () => {
   const png = await sharp({ create: { width: 8, height: 8, channels: 4, background: '#ffffff80' } })
     .png()
     .toBuffer();
@@ -87,6 +88,45 @@ test('png stays png, webp becomes jpeg, junk and heic are rejected with 415', as
   );
   const truncated = (await jpegWithGps()).subarray(0, 40);
   await assert.rejects(sanitizeImage(truncated), (e) => e.status === 415);
-  const heic = Buffer.concat([Buffer.alloc(4), Buffer.from('ftypheic'), Buffer.alloc(32)]);
-  await assert.rejects(sanitizeImage(heic), (e) => e.status === 415 && /HEIC/.test(e.message));
+  await assert.rejects(
+    sanitizeImage(Buffer.from('plain text that is long enough')),
+    (e) => e.status === 415 && e.message === 'unsupported image type',
+  );
+});
+
+const heicFixture = (name) => fs.readFileSync(new URL(`./fixtures/${name}`, import.meta.url));
+
+test('HEIC becomes a JPEG without metadata, at the same size caps', async () => {
+  const { buffer, ext } = await sanitizeImage(heicFixture('heic-plain.heic'));
+  assert.equal(ext, 'jpg');
+  assert.equal(buffer.subarray(0, 3).toString('hex'), 'ffd8ff');
+  const meta = await sharp(buffer).metadata();
+  assert.equal(meta.format, 'jpeg');
+  assert.equal(meta.exif, undefined);
+  assert.equal(meta.xmp, undefined);
+  assert.equal(meta.icc, undefined);
+  assert.equal(meta.width, 64);
+  assert.ok(Math.max(meta.width, meta.height) <= 2000);
+});
+
+test('HEIC orientation follows the container rotation', async () => {
+  const corner = async (name, x, y) => {
+    const { data } = await sharp((await sanitizeImage(heicFixture(name))).buffer)
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    return [data[(y * 64 + x) * 3], data[(y * 64 + x) * 3 + 1], data[(y * 64 + x) * 3 + 2]];
+  };
+  const near = (a, b) => a.every((v, i) => Math.abs(v - b[i]) < 40);
+  assert.ok(near(await corner('heic-plain.heic', 63, 0), [5, 0, 250]), 'plain: top-right is blue');
+  assert.ok(near(await corner('heic-rotated.heic', 0, 0), [5, 0, 250]), 'rotated: blue moved to top-left');
+});
+
+test('bad, huge and slow HEIC files keep their error statuses', async () => {
+  const good = heicFixture('heic-plain.heic');
+  await assert.rejects(
+    sanitizeImage(good.subarray(0, 250)),
+    (e) => e instanceof ImageError && e.status === 415 && e.message === 'could not read the image',
+  );
+  await assert.rejects(sanitizeImage(good, { heic: { maxPixels: 10 } }), (e) => e.status === 413);
+  await assert.rejects(sanitizeImage(good, { heic: { timeoutMs: 1 } }), (e) => e.status === 415);
 });

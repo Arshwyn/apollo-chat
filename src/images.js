@@ -1,4 +1,5 @@
 import sharp from 'sharp';
+import { decodeHeic } from './heic.js';
 
 export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 export const MAX_LONG_EDGE = 2000;
@@ -25,14 +26,23 @@ export class ImageError extends Error {
 }
 
 // Auto-orient, cap the long edge, and re-encode. sharp drops all metadata (EXIF, GPS, ICC, XMP)
-// unless asked to keep it, and this never asks.
-export async function sanitizeImage(buf) {
+// unless asked to keep it, and this never asks. HEIC/HEIF is first decoded to raw pixels in a worker thread
+// (src/heic.js); raw pixels carry no metadata at all, so the same re-encode below produces the output.
+export async function sanitizeImage(buf, { heic } = {}) {
   const type = detectType(buf);
   if (!type) throw new ImageError(415, 'unsupported image type');
-  if (type === 'heic')
-    throw new ImageError(415, 'HEIC photos are not supported; share as JPEG or take a screenshot');
   try {
-    let img = sharp(buf, { limitInputPixels: 100_000_000, failOn: 'error' })
+    let source = buf;
+    let options = { limitInputPixels: 100_000_000, failOn: 'error' };
+    if (type === 'heic') {
+      const { width, height, data } = await decodeHeic(buf, heic);
+      source = data;
+      options = { ...options, raw: { width, height, channels: 4 } };
+    }
+    let img = sharp(source, options);
+    // JPEG has no alpha: flatten transparent HEIC pixels onto white.
+    if (type === 'heic') img = img.flatten({ background: '#ffffff' });
+    img = img
       .rotate()
       .resize({ width: MAX_LONG_EDGE, height: MAX_LONG_EDGE, fit: 'inside', withoutEnlargement: true });
     if (type === 'png') {
@@ -40,7 +50,8 @@ export async function sanitizeImage(buf) {
       return { buffer: await img.toBuffer(), ext: 'png' };
     }
     return { buffer: await img.jpeg({ quality: 85 }).toBuffer(), ext: 'jpg' };
-  } catch {
+  } catch (e) {
+    if (e instanceof ImageError) throw e;
     throw new ImageError(415, 'could not read the image');
   }
 }
