@@ -43,8 +43,11 @@ export function createStagedPhotos({ api }) {
     ready: () => items.filter((i) => i.id),
     entries: () => [...items],
     // Hand the ready photos to a message and forget everything: a sent photo is never deleted from here.
+    // The UI does not send while an upload is pending, but any entry still in flight is marked removed so
+    // its staged file is deleted when the upload lands instead of lingering unowned.
     takeForSend() {
       const ids = items.filter((i) => i.id).map((i) => i.id);
+      for (const i of items) if (!i.id) i.removed = true;
       items = [];
       return ids;
     },

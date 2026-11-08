@@ -122,3 +122,20 @@ test('discarding on page exit deletes staged ids and the one still uploading del
   await tick();
   assert.deepEqual(api.calls.deleted, ['id2']);
 });
+
+test('a photo still uploading when a message is taken for sending is deleted once it lands', async () => {
+  const api = fakeApi();
+  const s = createStagedPhotos({ api });
+  const sent = s.add('sent');
+  const inFlight = s.add('late');
+  await tick();
+  api.pending[0]();
+  assert.equal(await sent.settled, 'ready');
+  const ids = s.takeForSend();
+  assert.deepEqual(ids, ['id1'], 'only the finished photo goes with the message');
+  api.pending[1]();
+  assert.equal(await inFlight.settled, 'removed');
+  await tick();
+  assert.deepEqual(api.calls.deleted, ['id2'], 'the late upload is deleted; the sent one is not');
+  assert.equal(s.count(), 0);
+});
