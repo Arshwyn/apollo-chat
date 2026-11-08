@@ -43,6 +43,10 @@ export const api = {
     fetch(`/api/conversations/${id}/messages?limit=50${before ? `&before=${before}` : ''}`, opts('GET')).then(
       json,
     ),
+  // Read-only day files of the signed-in user; the server decides whose.
+  dayfiles: (before) =>
+    fetch(`/api/dayfiles?limit=30${before ? `&before=${before}` : ''}`, opts('GET')).then(json),
+  dayfile: (date, name) => fetch(`/api/dayfiles/${date}/${name}`, opts('GET')).then(json),
   rename: (id, title) => fetch(`/api/conversations/${id}`, opts('PATCH', { title })).then(json),
   remove: (id) => fetch(`/api/conversations/${id}`, opts('DELETE')).then(json),
   removeAll: () => fetch('/api/me/data', opts('DELETE')).then(json),
