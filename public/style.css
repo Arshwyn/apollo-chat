@@ -236,10 +236,24 @@ button:disabled {
 .msg {
   overflow-wrap: anywhere;
 }
+/* A turn is the message plus its action row; the wrapper owns alignment and width. */
+.turn {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.turn.user {
+  align-self: flex-end;
+  align-items: flex-end;
+  max-width: 78%;
+}
+.turn.apollo {
+  align-self: flex-start;
+  width: 100%;
+  max-width: var(--measure);
+}
 /* The person's turn: a small sans block on the right. */
 .msg.user {
-  align-self: flex-end;
-  max-width: 78%;
   padding: 9px 13px;
   background: var(--mine);
   color: var(--on-mine);
@@ -248,7 +262,6 @@ button:disabled {
 }
 /* The coach speaks in serif prose with no bubble. */
 .msg.apollo {
-  align-self: flex-start;
   width: 100%;
   max-width: var(--measure);
   font: 400 var(--text-l) / 1.65 var(--font-display);
@@ -517,23 +530,30 @@ button:disabled {
   -webkit-user-select: text;
   user-select: text;
 }
+/* Copy: a quiet icon under the message, outside the bubble. The glyph is small; the target is --tap. */
+.msg-actions,
+.msg-actions svg {
+  -webkit-user-select: none;
+  user-select: none;
+}
 .msg-actions {
   display: flex;
-  margin: -8px 0 -12px;
+  margin: -2px 0 -14px;
 }
-.msg.user .msg-actions {
-  justify-content: flex-end;
+.turn.user .msg-actions {
+  margin-right: -11px;
+}
+.turn.apollo .msg-actions {
+  margin-left: -11px;
 }
 .copy-btn {
-  padding: 0 10px;
-  margin-left: -10px;
-  border: 0;
   color: var(--muted);
-  font-size: var(--text-s);
+  background: none;
+  border-radius: var(--radius-m);
 }
-.msg.user .copy-btn {
-  color: inherit;
-  margin: 0 -10px 0 0;
+.copy-btn svg {
+  width: 20px;
+  height: 20px;
 }
 #toast {
   position: fixed;
