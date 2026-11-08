@@ -112,3 +112,14 @@ test('coach replies take a definite width so wide tables scroll inside their fra
   assert.match(rule, /max-width:\s*var\(--measure\)/);
   assert.match(/\.table-wrap \{([^}]*)\}/.exec(css)[1], /overflow-x:\s*auto/);
 });
+
+test('the turn wrapper carries the alignment and the copy row is not selectable text', () => {
+  assert.match(/\.turn\.user \{([^}]*)\}/.exec(css)[1], /align-self:\s*flex-end/);
+  assert.match(/\.turn\.apollo \{([^}]*)\}/.exec(css)[1], /align-self:\s*flex-start/);
+  assert.match(/\.msg\.user \{([^}]*)\}/.exec(css)[1], /background:\s*var\(--mine\)/);
+  assert.doesNotMatch(/\.msg\.user \{([^}]*)\}/.exec(css)[1], /align-self/);
+  assert.match(/\.msg-actions,\s*\.msg-actions svg \{([^}]*)\}/.exec(css)[1], /user-select:\s*none/);
+  assert.match(/#app \{\s*-webkit-user-select: none;\s*user-select: none;/.exec(css)[0], /none/);
+  assert.match(/\.msg \.body,\s*#input \{([^}]*)\}/.exec(css)[1], /user-select:\s*text/);
+  assert.match(/\.copy-btn \{([^}]*)\}/.exec(css)[1], /color:\s*var\(--muted\)/);
+});

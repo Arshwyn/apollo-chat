@@ -45,6 +45,7 @@ Measured contrast (WCAG): text on ground 13.0 (light) and 14.3 (dark); muted on 
 - Hairline borders and a tinted surface carry structure; the drawer is the only element with a shadow.
 - The drawer opens over a scrim (`--scrim`) and behaves as a modal dialog: tapping the scrim or pressing Escape closes it, focus moves into it on open and returns to the menu button on close, and the page behind is inert meanwhile. No animation is required for it.
 - The active chat row has an inset accent bar on its left edge.
+- Copy is an icon-only button (two overlapping sheets, `--muted`) in a row under each message, outside the bubble: a `.turn` wrapper holds the message and the row and owns alignment. The glyph is 20px, the target is `--tap`, the row is not selectable text.
 - Motion is limited to short colour transitions on buttons, declared only under `prefers-reduced-motion: no-preference`.
 - Targets are at least 40px, and 44px on coarse pointers (`--tap`); small glyphs keep the full target through padding. Focus is a 2px accent ring with offset on every control.
 - Mobile first: the base is the phone layout; the column is centred and capped at 760px on wide screens. Safe-area insets are kept.

@@ -1,5 +1,5 @@
 import { api, ApiError } from './api.js';
-import { messageEl, renderBody } from './render.js';
+import { messageEl, renderBody, turnEl } from './render.js';
 import { conversationToText, copyText } from './copy.js';
 import { createDrawer } from './drawer.js';
 import { createStagedPhotos } from './staged.js';
@@ -228,11 +228,13 @@ function watchRunning(id) {
 }
 
 function bubble() {
-  const el = document.createElement('div');
-  el.className = 'msg apollo';
+  const el = turnEl('apollo');
+  const msg = document.createElement('div');
+  msg.className = 'msg apollo';
   const body = document.createElement('div');
   body.className = 'body';
-  el.append(body);
+  msg.append(body);
+  el.append(msg);
   els.messages.append(el);
   return { el, body, text: '' };
 }
