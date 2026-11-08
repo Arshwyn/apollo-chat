@@ -190,3 +190,28 @@ test('the app shell is served to authenticated users only, with safe paths and t
     await t.close();
   }
 });
+
+test('creating a conversation ignores unparseable bodies but not oversized ones', async () => {
+  const t = await startApp();
+  try {
+    const big = JSON.stringify({ timeZone: 'UTC', pad: 'x'.repeat(70 * 1024) });
+    const r = await t.call('alice', 'POST', '/api/conversations', big, {
+      'content-type': 'application/json',
+    });
+    assert.equal(r.status, 413);
+    assert.equal((await t.call('alice', 'GET', '/api/conversations')).json.conversations.length, 0);
+    for (const body of ['not json {', '[1,2]', '"str"', '']) {
+      const ok = await t.call('alice', 'POST', '/api/conversations', body, {
+        'content-type': 'application/json',
+      });
+      assert.equal(ok.status, 200, JSON.stringify(body));
+      assert.ok(ok.json.id);
+    }
+    // 10:00 UTC is already the next day on the far east side of the date line.
+    const tz = await t.call('bob', 'POST', '/api/conversations', { timeZone: 'Pacific/Kiritimati' });
+    assert.equal(tz.status, 200);
+    assert.equal(tz.json.title, '2026-11-06');
+  } finally {
+    await t.close();
+  }
+});

@@ -170,8 +170,12 @@ function coreRoutes({ config, stores, isBusy }) {
       'POST',
       '/api/conversations',
       async ({ req, user }) => {
-        // The body (a client time zone) is optional and never an error: a bad one is ignored.
-        const body = await readJson(req).catch(() => ({}));
+        // The body (a client time zone) is optional: a body that does not parse is ignored, but an
+        // oversized one is still rejected.
+        const body = await readJson(req).catch((e) => {
+          if (e instanceof HttpError && e.status === 400) return {};
+          throw e;
+        });
         return stores.forUser(user).createConversation(body.timeZone);
       },
     ],
