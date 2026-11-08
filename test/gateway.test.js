@@ -11,8 +11,10 @@ import {
   buildArgv,
   buildEnv,
   dayfileTouched,
+  MAX_PHOTOS,
 } from '../gateway/gateway.mjs';
 import { tmpDir, rmDir } from './helpers.js';
+import { MAX_PHOTOS_CEILING } from '../src/config.js';
 
 const FAKE_SRC = path.resolve(path.dirname(fileURLToPath(import.meta.url)), 'fixtures', 'fake-claude.mjs');
 const USERS = {
@@ -196,6 +198,32 @@ test('argv has no photo dir without photos and the env builder ignores everythin
   );
 });
 
+test('the gateway photo ceiling equals the largest limit the app accepts', () => {
+  assert.equal(MAX_PHOTOS, MAX_PHOTOS_CEILING);
+});
+
+test('eight photos with a maximum-length replayed prompt are accepted under the request limit', async () => {
+  const t = await setup();
+  try {
+    const photos = runDir(
+      t,
+      'alice',
+      'run-aaaaaaaa',
+      Array.from({ length: 8 }, (_, i) => `photo-${i}.jpg`),
+    );
+    const prompt = 'INFO' + 'x'.repeat(88_000);
+    const line = JSON.stringify(base({ prompt, photo_paths: photos })) + '\n';
+    assert.ok(Buffer.byteLength(line) < 256 * 1024);
+    const ev = await t.request(null, { raw: line });
+    assert.equal(exitOf(ev).code, 0);
+    const info = JSON.parse(ev.find((e) => e.type === 'line' && e.data.includes('"fake"')).data);
+    const adds = info.argv.filter((a) => a === '--add-dir').length;
+    assert.equal(adds, 2, 'one run folder and the transcripts, whatever the photo count');
+  } finally {
+    await t.close();
+  }
+});
+
 test('invalid requests are rejected and nothing is spawned', async () => {
   const t = await setup();
   try {
@@ -228,7 +256,7 @@ test('invalid requests are rejected and nothing is spawned', async () => {
       'missing file': base({
         photo_paths: [path.join(t.dataDir, 'users', 'alice', 'tmp', 'run-aaaaaaaa', 'nope.jpg')],
       }),
-      'too many photos': base({ photo_paths: [own[0], own[0], own[0], own[0], own[0]] }),
+      'too many photos': base({ photo_paths: Array(MAX_PHOTOS + 1).fill(own[0]) }),
       'photos not array': base({ photo_paths: own[0] }),
       'bad run id': base({ run_id: '../x' }),
       'short run id': base({ run_id: 'abc' }),

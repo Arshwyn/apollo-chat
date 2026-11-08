@@ -20,7 +20,9 @@ import { pathToFileURL } from 'node:url';
 const USER_ID = /^[a-z][a-z0-9_]{1,19}$/;
 const RUN_ID = /^[A-Za-z0-9_-]{8,64}$/;
 const MAX_REQUEST_BYTES = 256 * 1024;
-const MAX_PHOTOS = 4;
+// Defence in depth: must be at least the app's MAX_PHOTOS_PER_MESSAGE, which the app caps at 16. Raising the
+// limit above 16 means changing this and the app's ceiling (src/config.js) together.
+export const MAX_PHOTOS = 16;
 const RUN_KEYS = new Set(['user', 'prompt', 'run_id', 'photo_paths', 'check_dayfile']);
 
 // Chat runs get no shell: file tools only (the host hook confines them to the user's own folders),
