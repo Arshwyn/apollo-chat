@@ -5,6 +5,7 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { startApp } from './api-helpers.js';
 import crypto from 'node:crypto';
+import os from 'node:os';
 import { photoRoutes, claimPhotos, MAX_MESSAGE_PHOTO_BYTES } from '../src/photos.js';
 
 const jpeg = (w = 64) =>
@@ -237,6 +238,43 @@ test('combined size over the cap is 413', async () => {
       () => claimPhotos({ dataDir: t.dataDir, user: 'alice', runId: 'run-cap00001', photoIds: [id] }),
       (e) => e.status === 413,
     );
+  } finally {
+    await t.close();
+  }
+});
+
+test('a HEIC upload stages one sanitised JPEG and writes no HEIC bytes anywhere', async () => {
+  const t = await withPhotos();
+  try {
+    const heic = fs.readFileSync(new URL('./fixtures/heic-rotated.heic', import.meta.url));
+    const tmpBefore = new Set(fs.readdirSync(os.tmpdir()));
+    const r = await t.call('alice', 'POST', '/api/photos', heic, { 'content-type': 'image/heic' });
+    assert.equal(r.status, 200);
+    assert.match(r.json.photoId, /^[0-9a-f]{32}$/);
+    const root = path.join(t.dataDir, 'users');
+    const all = files(root).filter((f) => fs.statSync(path.join(root, f)).isFile());
+    assert.equal(all.length, 1, 'only one file exists under the data tree');
+    assert.ok(all[0].endsWith('.jpg'));
+    const staged = fs.readFileSync(path.join(root, all[0]));
+    assert.equal(staged.subarray(0, 3).toString('hex'), 'ffd8ff');
+    assert.equal(staged.includes(Buffer.from('ftypheic')), false);
+    const meta = await sharp(staged).metadata();
+    assert.equal(meta.exif, undefined);
+    assert.equal(meta.xmp, undefined);
+    // The temp folder is shared with other processes, so look only at new entries that could hold HEIC data.
+    const fresh = fs.readdirSync(os.tmpdir()).filter((n) => {
+      if (tmpBefore.has(n)) return false;
+      const f = path.join(os.tmpdir(), n);
+      try {
+        return /hei[cf]/i.test(n) || (fs.statSync(f).isFile() && fs.readFileSync(f).includes('ftyp'));
+      } catch {
+        return false;
+      }
+    });
+    assert.deepEqual(fresh, [], 'no HEIC data in the OS temp folder');
+    const corrupt = await t.call('alice', 'POST', '/api/photos', heic.subarray(0, 250));
+    assert.equal(corrupt.status, 415);
+    assert.equal(files(root).filter((f) => fs.statSync(path.join(root, f)).isFile()).length, 1);
   } finally {
     await t.close();
   }
