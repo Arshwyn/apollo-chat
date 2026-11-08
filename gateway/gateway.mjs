@@ -8,6 +8,8 @@
 // Protocol: newline-delimited JSON, one request per connection.
 //   run:    {"user":"...","prompt":"...","run_id":"...","photo_paths":[...],"check_dayfile":true}
 //   cancel: {"cancel":"<run_id>"}
+//   day files (read-only, see dayfiles.mjs): {"op":"dayfiles_list","user":"...","limit":30,"before":"YYYY-MM-DD"}
+//     -> {"type":"dayfiles","days":[{"date":"YYYY-MM-DD","files":["day.md"]}]}
 // Responses: {"type":"line","data":"<raw stream-json line>"} ..., then
 //   {"type":"exit","code":0,"signal":null,"timedOut":false,"cancelled":false,"dayfile":true|false|null}
 //   or {"type":"error","code":"invalid|busy|capacity|too_large|spawn"} (generic codes only).
@@ -16,6 +18,7 @@ import net from 'node:net';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
+import { DAYFILE_OPS, DayfileError, validateDayfileRequest, listDays } from './dayfiles.mjs';
 
 const USER_ID = /^[a-z][a-z0-9_]{1,19}$/;
 const RUN_ID = /^[A-Za-z0-9_-]{8,64}$/;
@@ -306,7 +309,33 @@ export function createGateway(cfg, { log = (o) => process.stdout.write(JSON.stri
       }
       return sock.end();
     }
+    if (req && typeof req === 'object' && !Array.isArray(req) && 'op' in req)
+      return handleDayfiles(sock, req);
     startRun(sock, req);
+  }
+
+  // Read-only day-file requests. One response (or one generic error), then the connection ends. The log line
+  // never carries dates, names, paths or content.
+  function handleDayfiles(sock, req) {
+    let code = 'ok';
+    let user = null;
+    try {
+      const r = validateDayfileRequest(cfg, req);
+      user = r.user;
+      if (r.op === 'dayfiles_list') send(sock, { type: 'dayfiles', days: listDays(cfg, r) });
+      else throw new DayfileError('invalid');
+    } catch (e) {
+      code = e instanceof DayfileError ? e.code : 'unavailable';
+      send(sock, { type: 'error', code });
+    }
+    sock.end();
+    log({
+      t: new Date().toISOString(),
+      event: 'dayfiles',
+      op: Object.hasOwn(DAYFILE_OPS, req.op) ? req.op : null,
+      user,
+      code,
+    });
   }
 
   const server = net.createServer((sock) => {
