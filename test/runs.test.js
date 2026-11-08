@@ -171,6 +171,30 @@ test('a successful run saves the reply, strips the trailer, deletes photos and w
   }
 });
 
+test('a message with eight photos reaches the run with all eight paths', async () => {
+  const t = setup(async (req, { onLine }) => {
+    onLine(delta('ok'));
+    onLine(result('ok'));
+    return ok();
+  });
+  try {
+    const conv = t.stores.forUser('alice').createConversation();
+    const ids = [];
+    for (let i = 0; i < 8; i++) {
+      const buffer = await sharp({ create: { width: 20 + i, height: 20, channels: 3, background: '#777' } })
+        .jpeg()
+        .toBuffer();
+      ids.push(await stagePhoto({ dataDir: t.dataDir, user: 'alice', buffer }));
+    }
+    const h = t.runs.start({ user: 'alice', conversationId: conv.id, text: 'analyze this', photoIds: ids });
+    await h.done;
+    assert.equal(t.calls[0].photo_paths.length, 8);
+    assert.equal(new Set(t.calls[0].photo_paths).size, 8);
+  } finally {
+    t.done();
+  }
+});
+
 test('failed runs keep photos, retry reuses them, success then deletes them', async () => {
   let n = 0;
   const t = setup(async (req, { onLine }) => {
