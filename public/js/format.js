@@ -15,8 +15,18 @@ export function parseInline(line) {
 }
 
 const BULLET = /^\s*(?:[-*•])\s+(.*)$/;
-const HEADING = /^ {0,3}(#{1,4})\s+(.+?)(?:\s+#+)?\s*$/;
-const TABLE_SEP = /^\s*\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?\s*$/;
+// Lines are trimmed once before these run, so none of them needs a trailing \s* (which backtracks
+// quadratically on long runs of spaces).
+const HEADING = /^ {0,3}(#{1,4})\s+(.+)$/;
+const TABLE_SEP = /^\|?\s*:?-+:?\s*(?:\|\s*:?-+:?\s*)*\|?$/;
+
+// Heading text without optional closing hashes ("## Title ##"), found by scanning, not by regex.
+function headingText(content) {
+  let end = content.length;
+  while (end > 0 && content[end - 1] === '#') end -= 1;
+  if (end > 0 && end < content.length && /\s/.test(content[end - 1])) return content.slice(0, end).trimEnd();
+  return content;
+}
 
 function splitRow(line) {
   let t = line.trim();
@@ -35,14 +45,18 @@ export function formatText(text) {
   for (let i = 0; i < lines.length; i++) {
     const raw = lines[i];
     const bullet = BULLET.exec(raw);
-    const heading = HEADING.exec(raw);
+    const heading = HEADING.exec(raw.trimEnd());
     const last = blocks[blocks.length - 1];
     if (heading) {
-      blocks.push({ type: 'heading', level: heading[1].length <= 2 ? 3 : 4, parts: parseInline(heading[2]) });
+      blocks.push({
+        type: 'heading',
+        level: heading[1].length <= 2 ? 3 : 4,
+        parts: parseInline(headingText(heading[2])),
+      });
     } else if (
       isTableRow(raw) &&
       i + 1 < lines.length &&
-      TABLE_SEP.test(lines[i + 1]) &&
+      TABLE_SEP.test(lines[i + 1].trim()) &&
       lines[i + 1].includes('-')
     ) {
       const header = splitRow(raw).map(parseInline);
