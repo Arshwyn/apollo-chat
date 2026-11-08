@@ -20,6 +20,7 @@ function decodeOnce(buffer, { maxPixels, timeoutMs }) {
     const worker = new Worker(WORKER_URL, {
       workerData: { buffer: copy, maxPixels },
       transferList: [copy],
+      execArgv: [],
       resourceLimits: { maxOldGenerationSizeMb: 256, maxYoungGenerationSizeMb: 32, stackSizeMb: 4 },
     });
     running++;
