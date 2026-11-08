@@ -8,6 +8,9 @@ export class GatewayError extends Error {
 }
 
 const RETRYABLE = new Set(['ENOENT', 'ECONNREFUSED']);
+const FINAL_RUN = new Set(['exit', 'cancelled']);
+const FINAL_DAYFILES = new Set(['dayfiles']);
+const FINAL_DAYFILE = new Set(['dayfile']);
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // Talks to the host gateway over a unix socket. The socket path is re-resolved on every request, so a
@@ -29,7 +32,7 @@ export function createGatewayClient({ socketPath, backoffMs = [200, 500, 1000, 2
     }
   }
 
-  async function exchange(request, onEvent, signal) {
+  async function exchange(request, onEvent, signal, final = FINAL_RUN) {
     const c = await connect(signal);
     return new Promise((resolve, reject) => {
       let buf = '';
@@ -50,7 +53,7 @@ export function createGatewayClient({ socketPath, backoffMs = [200, 500, 1000, 2
             continue;
           }
           if (ev.type === 'error') result = new GatewayError(String(ev.code || 'error'));
-          else if (ev.type === 'exit' || ev.type === 'cancelled') result = ev;
+          else if (final.has(ev.type)) result = ev;
           else onEvent?.(ev);
         }
       });
@@ -69,6 +72,18 @@ export function createGatewayClient({ socketPath, backoffMs = [200, 500, 1000, 2
     // Resolves with the gateway's exit event; `onLine` receives each raw stream-json line.
     run(request, { onLine, signal } = {}) {
       return exchange(request, (ev) => ev.type === 'line' && onLine?.(ev.data), signal);
+    },
+    // Read-only day files of one user. Each resolves with the gateway's single response event or rejects with a
+    // GatewayError carrying its generic code (`invalid`, `not_found`, `too_large`, `unavailable`).
+    async listDayfiles({ user, limit, before }, { signal } = {}) {
+      const req = { op: 'dayfiles_list', user };
+      if (limit !== undefined) req.limit = limit;
+      if (before) req.before = before;
+      return (await exchange(req, undefined, signal, FINAL_DAYFILES)).days;
+    },
+    async readDayfile({ user, date, name }, { signal } = {}) {
+      const ev = await exchange({ op: 'dayfile_read', user, date, name }, undefined, signal, FINAL_DAYFILE);
+      return { date: ev.date, name: ev.name, text: ev.text };
     },
     async cancel(runId) {
       try {
