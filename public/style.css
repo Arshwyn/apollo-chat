@@ -48,6 +48,7 @@
   --danger: #a8341f;
   --on-danger: #fbf8f2;
   --shadow: rgb(20 38 47 / 0.22);
+  --scrim: rgb(20 38 47 / 0.42);
 
   --font-display: 'Literata', Georgia, 'Times New Roman', serif;
   --font-body: 'Public Sans', system-ui, -apple-system, 'Segoe UI', sans-serif;
@@ -92,6 +93,7 @@
     --danger: #f0846f;
     --on-danger: #0d1b24;
     --shadow: rgb(0 0 0 / 0.5);
+    --scrim: rgb(0 0 0 / 0.6);
   }
 }
 [hidden] {
@@ -414,6 +416,12 @@ button:disabled {
 }
 #input::placeholder {
   color: var(--muted);
+}
+#scrim {
+  position: fixed;
+  inset: 0;
+  background: var(--scrim);
+  z-index: 4;
 }
 #drawer {
   position: fixed;

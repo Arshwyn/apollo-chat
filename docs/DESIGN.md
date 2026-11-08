@@ -29,6 +29,7 @@ Both sets are defined once as CSS custom properties; rules use the role names on
 | `--gold`                   | the sun mark in the header, nowhere else                                     | `#9c7a2c`             | `#d6b360`             |
 | `--danger` / `--on-danger` | offline banner, error note, Delete and Delete all; nothing else              | `#a8341f` / `#fbf8f2` | `#f0846f` / `#0d1b24` |
 | `--shadow`                 | the drawer's only shadow                                                     | translucent ink       | translucent black     |
+| `--scrim`                  | dimming layer behind the open drawer                                         | translucent ink       | translucent black     |
 
 Measured contrast (WCAG): text on ground 13.0 (light) and 14.3 (dark); muted on ground 5.1 and 6.8; on-mine on mine 8.2 and 8.9; on-accent on accent 8.2 and 7.0; accent on ground 7.4 and 7.0; on-danger on danger 6.2 and 6.9; olive on olive-bg 5.9 and 6.8; sun mark on surface 3.7 (light) and 7.8 (dark); input edge on ground 3.1 and 3.5.
 
@@ -42,6 +43,7 @@ Measured contrast (WCAG): text on ground 13.0 (light) and 14.3 (dark); muted on 
 
 - Radii 8, 12 and 16px; the person's block has a small corner (4px) bottom right; the input and Stop are pills.
 - Hairline borders and a tinted surface carry structure; the drawer is the only element with a shadow.
+- The drawer opens over a scrim (`--scrim`) and behaves as a modal dialog: tapping the scrim or pressing Escape closes it, focus moves into it on open and returns to the menu button on close, and the page behind is inert meanwhile. No animation is required for it.
 - The active chat row has an inset accent bar on its left edge.
 - Motion is limited to short colour transitions on buttons, declared only under `prefers-reduced-motion: no-preference`.
 - Targets are at least 40px, and 44px on coarse pointers (`--tap`); small glyphs keep the full target through padding. Focus is a 2px accent ring with offset on every control.
