@@ -389,3 +389,242 @@ test('gateway log lines for day files carry no dates, names, paths or content', 
     await t.close();
   }
 });
+
+const readReq = (extra) => ({
+  op: 'dayfile_read',
+  user: 'alice',
+  date: '2026-11-05',
+  name: 'day.md',
+  ...extra,
+});
+const textOf = (ev) => ev.find((e) => e.type === 'dayfile');
+
+test('a user reads their own day file and nothing of the other user', async () => {
+  const t = await setup();
+  try {
+    t.put('alice', '2026-11-05', 'day.md', '# Alice\n\n| a | b |\n|---|---|\n| 1 | 2 |\n');
+    t.put('bob', '2026-11-05', 'day.md', 'BOB-ONLY');
+    t.put('bob', '2026-11-06', 'bobday.md', 'BOB-ONLY');
+    const before = snapshot(t.mem);
+    const ev = await t.ask(readReq());
+    assert.deepEqual(textOf(ev), {
+      type: 'dayfile',
+      date: '2026-11-05',
+      name: 'day.md',
+      text: '# Alice\n\n| a | b |\n|---|---|\n| 1 | 2 |\n',
+    });
+    assert.equal(textOf(await t.ask(readReq({ user: 'bob' }))).text, 'BOB-ONLY');
+    // bob's names and dates are not discoverable through alice
+    assert.equal(codeOf(await t.ask(readReq({ date: '2026-11-06', name: 'bobday.md' }))), 'not_found');
+    assert.equal(codeOf(await t.ask(readReq({ date: '2026-11-06' }))), 'not_found');
+    assert.equal(codeOf(await t.ask({ ...readReq(), user: 'carol' })), 'invalid');
+    assert.equal(snapshot(t.mem), before);
+  } finally {
+    await t.close();
+  }
+});
+
+test('missing files, days and users are not_found with no detail', async () => {
+  const t = await setup();
+  try {
+    assert.equal(codeOf(await t.ask(readReq())), 'not_found');
+    t.put('alice', '2026-11-05', 'other.md');
+    const ev = await t.ask(readReq());
+    assert.deepEqual(ev, [{ type: 'error', code: 'not_found' }]);
+    assert.equal(codeOf(await t.ask(readReq({ date: '2026-11-06' }))), 'not_found');
+    assert.equal(codeOf(await t.ask(readReq({ date: '2025-01-01' }))), 'not_found');
+  } finally {
+    await t.close();
+  }
+});
+
+test('traversal, odd names and odd dates never reach the filesystem', async () => {
+  const t = await setup();
+  try {
+    t.put('alice', '2026-11-05', 'day.md', 'ok');
+    t.put('bob', '2026-11-05', 'day.md', 'BOB-ONLY');
+    fs.writeFileSync(path.join(t.root, 'outside.md'), 'OUTSIDE');
+    const names = [
+      '..',
+      '../day.md',
+      '../../../bob/history/2026/11/05/day.md',
+      '../../../../outside.md',
+      path.join(t.mem, 'bob', 'history', '2026', '11', '05', 'day.md'),
+      '%2e%2e%2fday.md',
+      'day.md\0',
+      '..\\day.md',
+      'Day.md',
+      'day.md.txt',
+      'day.txt',
+      'day',
+      '.md',
+      '.hidden.md',
+    ];
+    for (const name of names) {
+      const ev = await t.ask(readReq({ name }));
+      assert.equal(codeOf(ev), 'invalid', name);
+      assert.equal(JSON.stringify(ev).includes('BOB-ONLY') || JSON.stringify(ev).includes('OUTSIDE'), false);
+    }
+    for (const date of [
+      '../2026-11-05',
+      '2026-02-30',
+      '2026-13-01',
+      '26-1-1',
+      '2026-1-01',
+      ' 2026-11-05',
+      5,
+      ['2026-11-05'],
+    ]) {
+      assert.equal(codeOf(await t.ask(readReq({ date }))), 'invalid');
+    }
+    assert.equal(codeOf(await t.ask(readReq({ extra: 1 }))), 'invalid');
+  } finally {
+    await t.close();
+  }
+});
+
+test('links are refused at every level, even when they resolve inside the history folder', async () => {
+  const t = await setup();
+  try {
+    const bobFile = t.put('bob', '2026-11-05', 'day.md', 'BOB-ONLY');
+    const outside = path.join(t.root, 'outside.md');
+    fs.writeFileSync(outside, 'OUTSIDE');
+    const own = t.put('alice', '2026-11-05', 'real.md', 'own');
+    const dayDir = path.dirname(own);
+    fs.symlinkSync(bobFile, path.join(dayDir, 'tobob.md'));
+    fs.symlinkSync(outside, path.join(dayDir, 'tooutside.md'));
+    fs.symlinkSync(own, path.join(dayDir, 'inside.md'));
+    for (const name of ['tobob.md', 'tooutside.md', 'inside.md']) {
+      const ev = await t.ask(readReq({ name }));
+      assert.equal(codeOf(ev), 'not_found', name);
+      assert.equal(JSON.stringify(ev).includes('BOB-ONLY') || JSON.stringify(ev).includes('OUTSIDE'), false);
+    }
+    // linked day, month and year folders
+    const hist = path.join(t.mem, 'alice', 'history');
+    t.put('bob', '2026-09-09', 'day.md', 'BOB-ONLY');
+    fs.symlinkSync(
+      path.join(t.mem, 'bob', 'history', '2026', '09', '09'),
+      path.join(hist, '2026', '11', '07'),
+    );
+    fs.symlinkSync(path.join(t.mem, 'bob', 'history', '2026', '09'), path.join(hist, '2026', '10'));
+    fs.symlinkSync(path.join(t.mem, 'bob', 'history', '2026'), path.join(hist, '2027'));
+    fs.symlinkSync(path.join(hist, '2026', '11', '05'), path.join(hist, '2026', '11', '08'));
+    for (const date of ['2026-11-07', '2026-10-09', '2027-09-09', '2026-11-08']) {
+      assert.equal(codeOf(await t.ask(readReq({ date, name: 'day.md' }))), 'not_found', date);
+    }
+    assert.equal(codeOf(await t.ask(readReq({ date: '2026-11-08', name: 'real.md' }))), 'not_found');
+    assert.equal(textOf(await t.ask(readReq({ name: 'real.md' }))).text, 'own');
+    // a linked user root, and a user root that is a link into another user's folder
+    fs.rmSync(path.join(t.mem, 'alice'), { recursive: true });
+    fs.symlinkSync(path.join(t.mem, 'bob'), path.join(t.mem, 'alice'));
+    assert.equal(codeOf(await t.ask(readReq({ name: 'day.md' }))), 'unavailable');
+  } finally {
+    await t.close();
+  }
+});
+
+test('non-regular files named like day files are not read', async () => {
+  const t = await setup();
+  try {
+    const p = t.put('alice', '2026-11-05', 'real.md');
+    const dir = path.dirname(p);
+    fs.mkdirSync(path.join(dir, 'dir.md'));
+    const fifo = path.join(dir, 'fifo.md');
+    const { spawnSync } = await import('node:child_process');
+    if (spawnSync('mkfifo', [fifo]).status === 0) {
+      assert.equal(codeOf(await t.ask(readReq({ name: 'fifo.md' }))), 'not_found');
+    }
+    assert.equal(codeOf(await t.ask(readReq({ name: 'dir.md' }))), 'not_found');
+  } finally {
+    await t.close();
+  }
+});
+
+test('the size cap is 256 KiB: exactly at the cap reads, one byte over is too_large', async () => {
+  const t = await setup();
+  try {
+    const cap = 256 * 1024;
+    t.put('alice', '2026-11-05', 'day.md', 'a'.repeat(cap));
+    t.put('alice', '2026-11-05', 'big.md', 'a'.repeat(cap + 1));
+    assert.equal(textOf(await t.ask(readReq())).text.length, cap);
+    assert.deepEqual(await t.ask(readReq({ name: 'big.md' })), [{ type: 'error', code: 'too_large' }]);
+  } finally {
+    await t.close();
+  }
+});
+
+test('text that is not valid UTF-8 is invalid; multi-byte text round-trips', async () => {
+  const t = await setup();
+  try {
+    t.put('alice', '2026-11-05', 'bad.md', Buffer.from([0x68, 0xff, 0xfe, 0x69]));
+    t.put('alice', '2026-11-05', 'day.md', 'Entra\u00eene \u2014 d\u00e9j\u00e0 vu \u{1F4AA}');
+    assert.equal(codeOf(await t.ask(readReq({ name: 'bad.md' }))), 'invalid');
+    assert.equal(textOf(await t.ask(readReq())).text, 'Entra\u00eene \u2014 d\u00e9j\u00e0 vu \u{1F4AA}');
+  } finally {
+    await t.close();
+  }
+});
+
+test('read requests with an unset memory root are unavailable', async () => {
+  const t = await setup({ memory: false });
+  try {
+    assert.equal(codeOf(await t.ask(readReq())), 'unavailable');
+  } finally {
+    await t.close();
+  }
+});
+
+test('no gateway log line carries content, names, dates or paths across read outcomes', async () => {
+  const t = await setup();
+  try {
+    t.put('alice', '2026-11-05', 'day.md', 'PRIVATE-CONTENT');
+    t.put('alice', '2026-11-05', 'bad.md', Buffer.from([0xff]));
+    t.put('alice', '2026-11-05', 'big.md', 'a'.repeat(256 * 1024 + 1));
+    await t.ask(readReq());
+    await t.ask(readReq({ name: 'missing.md' }));
+    await t.ask(readReq({ name: 'big.md' }));
+    await t.ask(readReq({ name: 'bad.md' }));
+    await t.ask(readReq({ name: '../day.md' }));
+    assert.equal(t.logs.length, 5);
+    assert.deepEqual(
+      t.logs.map((l) => JSON.parse(l).code),
+      ['ok', 'not_found', 'too_large', 'invalid', 'invalid'],
+    );
+    for (const l of t.logs) {
+      const o = JSON.parse(l);
+      assert.deepEqual(Object.keys(o), ['t', 'event', 'op', 'user', 'code']);
+      assert.ok(!/2026-|\.md|missing|big|bad|PRIVATE|memory|\.\./.test(l.replace(o.t, '')), l);
+    }
+  } finally {
+    await t.close();
+  }
+});
+
+test('the day-file module uses read-only file APIs only', () => {
+  const src = fs.readFileSync(new URL('../gateway/dayfiles.mjs', import.meta.url), 'utf8');
+  const code = src.replace(/\/\/.*$/gm, '');
+  for (const api of [
+    'writeFile',
+    'appendFile',
+    'rename',
+    'unlink',
+    'rmSync',
+    'rmdir',
+    'mkdir',
+    'copyFile',
+    'truncate',
+    'chmod',
+    'chown',
+    'symlink',
+    'utimes',
+    'writeSync',
+    'createWriteStream',
+    'O_WRONLY',
+    'O_RDWR',
+    'O_CREAT',
+    'O_APPEND',
+    'O_TRUNC',
+  ]) {
+    assert.equal(code.includes(api), false, api);
+  }
+});

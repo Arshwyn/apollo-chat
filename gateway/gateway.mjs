@@ -10,6 +10,7 @@
 //   cancel: {"cancel":"<run_id>"}
 //   day files (read-only, see dayfiles.mjs): {"op":"dayfiles_list","user":"...","limit":30,"before":"YYYY-MM-DD"}
 //     -> {"type":"dayfiles","days":[{"date":"YYYY-MM-DD","files":["day.md"]}]}
+//   {"op":"dayfile_read","user":"...","date":"YYYY-MM-DD","name":"day.md"} -> {"type":"dayfile","date","name","text"}
 // Responses: {"type":"line","data":"<raw stream-json line>"} ..., then
 //   {"type":"exit","code":0,"signal":null,"timedOut":false,"cancelled":false,"dayfile":true|false|null}
 //   or {"type":"error","code":"invalid|busy|capacity|too_large|spawn"} (generic codes only).
@@ -18,7 +19,7 @@ import net from 'node:net';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-import { DAYFILE_OPS, DayfileError, validateDayfileRequest, listDays } from './dayfiles.mjs';
+import { DAYFILE_OPS, DayfileError, validateDayfileRequest, listDays, readDayfile } from './dayfiles.mjs';
 
 const USER_ID = /^[a-z][a-z0-9_]{1,19}$/;
 const RUN_ID = /^[A-Za-z0-9_-]{8,64}$/;
@@ -323,7 +324,7 @@ export function createGateway(cfg, { log = (o) => process.stdout.write(JSON.stri
       const r = validateDayfileRequest(cfg, req);
       user = r.user;
       if (r.op === 'dayfiles_list') send(sock, { type: 'dayfiles', days: listDays(cfg, r) });
-      else throw new DayfileError('invalid');
+      else send(sock, { type: 'dayfile', date: r.date, name: r.name, text: readDayfile(cfg, r) });
     } catch (e) {
       code = e instanceof DayfileError ? e.code : 'unavailable';
       send(sock, { type: 'error', code });
