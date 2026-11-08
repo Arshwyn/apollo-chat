@@ -93,6 +93,8 @@ Open the site in Chrome, sign in through Access, then use the browser menu and c
 
 No analytics, telemetry, third-party scripts or external requests (no external fonts either: the typefaces are self-hosted under `public/fonts/`); a strict CSP (`default-src 'self'`). Logs hold only time, user id, method, route template, status, duration and run exit code, never message text, filenames, prompts, tokens or emails. Health data lives only in `DATA_DIR` (outside the repo, mode 0700) and in the agent's own memory folder. Each user can delete their data from the menu.
 
+The agent's chat runs can reach the web (search and fetch) and destinations are not restricted; this is recorded as accepted residual risk in [`docs/ISOLATION.md`](docs/ISOLATION.md).
+
 ## Design notes (why)
 
 - **The user binding is an environment variable, set by the gateway.** The host hook cannot tell two simultaneous runs apart through a single lock file, so the gateway sets `APOLLO_USER` (and `APOLLO_CHAT_RUN=1`, `APOLLO_CHAT_DATA`, `APOLLO_RUN_ID`) per process and the hook enforces it for every tool call in that process.
