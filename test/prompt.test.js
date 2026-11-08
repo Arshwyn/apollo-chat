@@ -25,3 +25,22 @@ test('the photo instruction states retention accurately and keeps the write-befo
 test('without photos the prompt has no photo instruction', () => {
   assert.ok(!buildPrompt(base).includes('Attached photos'));
 });
+
+test('note and photo saving point at the one day file per day', () => {
+  const p = buildPrompt({ ...base, photoPaths: ['/path/to/tmp/run-1/photo-1.jpg'] });
+  assert.match(p, /Notes section/);
+  assert.match(p, /day\.md/);
+  assert.match(p, /Intake \(or Recovery\)/);
+  assert.match(p, /estimates marked with a range/);
+  assert.match(p, /BEFORE replying/);
+  assert.ok(!p.includes('saved note'));
+  assert.ok(!p.includes("save a short dated note in that user's history folder"));
+  assert.ok(!p.includes('`Intake:` line'));
+  assert.match(p, /profile changes are only proposed, never applied without approval/);
+});
+
+test('the prompt names only the one user', () => {
+  const p = buildPrompt({ ...base, user: 'alice' });
+  assert.match(p, /`alice`/);
+  assert.ok(!p.includes('bob'));
+});

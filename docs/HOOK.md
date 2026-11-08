@@ -29,7 +29,7 @@ The hook lives on the host, so any change here takes effect only after the opera
 
 Add this short paragraph to the single host rules file:
 
-> Free chat (messages that are not a coaching trigger): when a message contains a durable fact (an injury, a preference, a correction to one of your estimates, a goal change), save a short dated note in that user's history folder before replying. Profile changes are still only proposed to the user and need approval. Do not read the chat database or transcripts to produce analysis: the day files remain the source of truth; grep the user's `transcripts/` folder only when the user asks about something said earlier in chat. When a photo is attached, write its extracted numbers (an `Intake:` line for food, recovery numbers and so on, estimates marked with a range) to the day file before replying, because the photo is temporary.
+> Free chat (messages that are not a coaching trigger): when a message contains a durable fact (an injury, a preference, a correction to one of your estimates, a goal change), add a short dated line to the Notes section of that day's `day.md` (`history/YYYY/MM/DD/day.md`, the day being the user's local date) before replying. Profile changes are still only proposed to the user and need approval. Do not read the chat database or transcripts to produce analysis: the day files remain the source of truth; grep the user's `transcripts/` folder only when the user asks about something said earlier in chat. When a photo is attached, write its extracted numbers into the day file's Intake (or Recovery) section, estimates marked with a range, before replying, because the photo is temporary.
 
 ## Test coverage
 

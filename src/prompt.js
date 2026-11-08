@@ -46,13 +46,13 @@ export function buildPrompt({
     'Chat runs have no shell and no /tmp access. Do not list or clean /tmp, and skip the temp-file and mail trailer steps from your start-up text: end the reply without `temp:` or `mail:` lines. Never call Glob or Grep without a path inside your own folder; prefer reading the specific day files you need over globbing. Never call a tool only to satisfy a start-up checklist item that needs a shell or another folder.',
     'If a call is blocked, say so honestly and briefly in your reply, then carry on and answer with what you can; a blocked call must not stop the reply.',
     'This is the chat channel (a phone screen). Reply in plain text, no tables wider than a few columns.',
-    "Free chat: when the message contains a durable fact (an injury, a preference, a correction to one of your estimates, a goal change), save a short dated note in that user's history folder before replying; profile changes are only proposed, never applied without approval.",
+    "Free chat: when the message contains a durable fact (an injury, a preference, a correction to one of your estimates, a goal change), add a short dated line to the Notes section of that user's day file (`history/YYYY/MM/DD/day.md`, the day being the user's local date from the clock line above) before replying; profile changes are only proposed, never applied without approval.",
     `Earlier chat is stored as text transcripts in \`${transcriptsDir}/\`. Search them only if the user asks about something said earlier; never read any chat database. Day files stay the source of truth for analysis.`,
   ];
   if (photoPaths.length) {
     parts.push(
       '',
-      'Attached photos are temporary: they are removed after a successful run, and in any case after the retention window if the run fails or is cancelled. Read each one with the Read tool and, BEFORE replying, write what you extracted to the day file as your rules require (an `Intake:` line for food, recovery numbers, estimates marked with a range).',
+      'Attached photos are temporary: they are removed after a successful run, and in any case after the retention window if the run fails or is cancelled. Read each one with the Read tool and, BEFORE replying, write the extracted numbers into the Intake (or Recovery) section of the day file as your rules require, with estimates marked with a range.',
       'Attached photos:',
       ...photoPaths.map((p) => `- ${p}`),
     );
