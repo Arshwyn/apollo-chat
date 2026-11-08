@@ -1,6 +1,7 @@
 import { api, ApiError } from './api.js';
 import { messageEl, renderBody } from './render.js';
 import { conversationToText, copyText } from './copy.js';
+import { createDrawer } from './drawer.js';
 
 const MAX_PHOTOS = 4;
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -16,11 +17,18 @@ const els = {
   file: $('file'),
   attach: $('attach-btn'),
   previews: $('previews'),
-  drawer: $('drawer'),
   list: $('chat-list'),
   offline: $('offline'),
   toast: $('toast'),
 };
+
+const drawer = createDrawer({
+  drawer: $('drawer'),
+  scrim: $('scrim'),
+  opener: $('menu-btn'),
+  closeButton: $('close-drawer'),
+  background: ['bar', 'offline', 'messages', 'status', 'composer'].map($),
+});
 
 const state = { conv: null, convs: [], busy: false, photos: [], oldest: null, poll: null };
 
@@ -46,7 +54,7 @@ async function copyWithFeedback(text) {
 
 async function copyConversation() {
   if (!state.conv) return;
-  els.drawer.hidden = true;
+  drawer.close();
   try {
     // Page back through the whole chat, not just the part currently on screen.
     let all = [];
@@ -172,7 +180,7 @@ function failedNote(m) {
 }
 
 async function openConversation(id) {
-  els.drawer.hidden = true;
+  drawer.close();
   clearInterval(state.poll);
   const data = await api.messages(id);
   state.conv = data.conversation;
@@ -367,8 +375,6 @@ els.form.addEventListener('submit', (e) => {
 });
 els.input.addEventListener('input', autosize);
 els.cancel.addEventListener('click', () => state.conv && api.cancel(state.conv.id).catch(() => {}));
-$('menu-btn').addEventListener('click', () => (els.drawer.hidden = false));
-$('close-drawer').addEventListener('click', () => (els.drawer.hidden = true));
 $('copy-chat').addEventListener('click', () => copyConversation());
 $('new-btn').addEventListener('click', () => newConversation());
 $('delete-all').addEventListener('click', async () => {

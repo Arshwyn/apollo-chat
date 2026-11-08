@@ -116,3 +116,10 @@ test('every @font-face url in style.css is precached by the worker and exists on
   }
   assert.match(read('public/sw.js'), /apollo-shell-v3/);
 });
+
+test('every script module under public/js is in the precached app shell', () => {
+  const shell = /const SHELL = \[([\s\S]*?)\];/.exec(read('public/sw.js'))[1];
+  const entries = [...shell.matchAll(/'([^']+)'/g)].map((m) => m[1]);
+  for (const f of fs.readdirSync(new URL('../public/js/', import.meta.url)))
+    assert.ok(entries.includes(`/js/${f}`), `/js/${f} is in SHELL`);
+});

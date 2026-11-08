@@ -60,7 +60,8 @@
           <button id="cancel-btn" type="button" hidden>Stop</button>
         </div>
       </form>
-      <aside id="drawer" hidden>
+      <div id="scrim" aria-hidden="true" hidden></div>
+      <aside id="drawer" role="dialog" aria-modal="true" aria-label="Chats" hidden>
         <div id="drawer-head">
           <h2>Chats</h2>
           <button id="close-drawer" class="icon-btn" type="button" aria-label="Close">
