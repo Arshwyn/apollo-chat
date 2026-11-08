@@ -259,6 +259,36 @@ test('oversized requests are refused', async () => {
   }
 });
 
+test('a connection that never sends a request line is closed without starting a run', async () => {
+  const t = await setup({ REQUEST_TIMEOUT_MS: '200' });
+  try {
+    const started = Date.now();
+    assert.deepEqual(await t.request(null, { raw: '' }), [], 'silent socket');
+    assert.ok(Date.now() - started < 3000);
+    assert.deepEqual(await t.request(null, { raw: '{"user":"alice","prompt":"hi"' }), [], 'no newline');
+    assert.equal(t.spawned(), '');
+    assert.equal(t.gw.active.size, 0);
+  } finally {
+    await t.close();
+  }
+});
+
+test('the request timeout does not affect a normal request or a run that outlasts it', async () => {
+  const t = await setup({ REQUEST_TIMEOUT_MS: '100' });
+  try {
+    const ev = await t.request(base({ prompt: 'SLEEP 400' }));
+    assert.equal(exitOf(ev).code, 0);
+    assert.equal(exitOf(ev).timedOut, false);
+    // A line that arrives late but within the limit is still served.
+    const c = t.open('');
+    await new Promise((r) => setTimeout(r, 30));
+    c.conn.write(JSON.stringify({ cancel: 'run-zzzzzzzz' }) + '\n');
+    assert.deepEqual(await c.done, [{ type: 'error', code: 'invalid' }]);
+  } finally {
+    await t.close();
+  }
+});
+
 test('timeout kills the child and reports it', async () => {
   const t = await setup({ RUN_TIMEOUT_MS: '300' });
   try {
