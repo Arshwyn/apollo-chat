@@ -4,13 +4,13 @@ Two people use the app. Neither may see the other's chats, photos, transcripts o
 
 ## Who can see what
 
-| Data                                        | Owner can                                 | Other user can                      | Enforced by                                                                                   |
-| ------------------------------------------- | ----------------------------------------- | ----------------------------------- | --------------------------------------------------------------------------------------------- |
-| Chat history (`users/<user>/chat.db`)       | read, rename, delete                      | nothing; their id returns 404       | separate files per user, the store opens only the verified user's path, every route is scoped |
-| Staged and run photos (`users/<user>/tmp/`) | upload, send, remove an unsent one        | nothing; their photo id is rejected | per-user directories, ids are random and checked against the caller's tree                    |
-| Transcripts (`users/<user>/transcripts/`)   | nothing directly; the agent may grep them | nothing                             | per-user directories, the host hook allows only the active user's folder                      |
-| Agent memory and day files                  | nothing directly                          | nothing                             | the host hook (per process, from `APOLLO_USER`)                                               |
-| Health connectors                           | through the agent                         | not through their run               | gateway tool lists plus the host hook                                                         |
+| Data                                        | Owner can                                 | Other user can                      | Enforced by                                                                                                                                                                                    |
+| ------------------------------------------- | ----------------------------------------- | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Chat history (`users/<user>/chat.db`)       | read, rename, delete                      | nothing; their id returns 404       | separate files per user, the store opens only the verified user's path, every route is scoped                                                                                                  |
+| Staged and run photos (`users/<user>/tmp/`) | upload, send, remove an unsent one        | nothing; their photo id is rejected | per-user directories, ids are random and checked against the caller's tree, links are never followed; removed at once when discarded, swept after about 1 h unsent and 24 h after a failed run |
+| Transcripts (`users/<user>/transcripts/`)   | nothing directly; the agent may grep them | nothing                             | per-user directories, the host hook allows only the active user's folder                                                                                                                       |
+| Agent memory and day files                  | nothing directly                          | nothing                             | the host hook (per process, from `APOLLO_USER`)                                                                                                                                                |
+| Health connectors                           | through the agent                         | not through their run               | gateway tool lists plus the host hook                                                                                                                                                          |
 
 ## Layers
 

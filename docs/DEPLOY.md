@@ -18,7 +18,7 @@ container (app)  --unix socket (directory bind-mount)-->  host gateway  -->  cla
 
 ## One-time host steps
 
-1. **Data directory.** Create an absolute `DATA_DIR` outside any repository, owned by the service user, mode 0700 (the app creates `users/<user>/...` with 0700/0600). Decide retention: chats and transcripts are text and are kept until the user deletes them; photos are transient (24 h at most on failure). Exclude `users/*/tmp/` from backups.
+1. **Data directory.** Create an absolute `DATA_DIR` outside any repository, owned by the service user, mode 0700 (the app creates `users/<user>/...` with 0700/0600). Decide retention: chats and transcripts are text and are kept until the user deletes them; photos are transient (deleted at once when discarded, about 1 h for photos never sent, 24 h at most after a failed run). Exclude `users/*/tmp/` from backups.
 2. **Container user.** The container user's uid and gid (`APP_UID`, `APP_GID`) must match the host owner of `DATA_DIR/users`, or share a group with group-write, so the host-run `claude` can read photos the app writes and the app can read the transcript and day-file paths it checks.
 3. **Gateway socket directory.** Create a dedicated directory (mode 0750, group shared with the container user). The gateway creates `gateway.sock` inside it with mode 0660. Confirm no other host user can reach it.
 4. **Gateway unit.** Copy `gateway/gateway.env.example` to a private file (mode 0600), fill it in (`GATEWAY_USERS` maps each user to the connector tool prefixes their runs may use), adapt `gateway/apollo-chat-gateway.service` (service user, group, paths), install it and enable it. The unit needs only Node 20 on the host; no Node 24 install is required.

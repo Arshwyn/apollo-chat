@@ -2,9 +2,19 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { userPaths } from './store.js';
 
-// Removes temp photo directories (staged or per-run) older than the TTL. Each user is swept only
+const STAGED_PREFIX = 'stg-';
+
+// Removes temp photo directories older than their TTL: photos staged but never sent (stg-*) use the short
+// stagedTtlMs, run directories (kept after a failed or cancelled run) use ttlMs. Each user is swept only
 // inside their own tmp tree. Directories of runs that are still active are never touched.
-export function sweepPhotos({ dataDir, userIds, ttlMs, now = Date.now(), activeRunIds = new Set() }) {
+export function sweepPhotos({
+  dataDir,
+  userIds,
+  ttlMs,
+  stagedTtlMs = 60 * 60 * 1000,
+  now = Date.now(),
+  activeRunIds = new Set(),
+}) {
   let removed = 0;
   for (const user of userIds) {
     const tmp = userPaths(dataDir, user).tmp;
@@ -18,7 +28,8 @@ export function sweepPhotos({ dataDir, userIds, ttlMs, now = Date.now(), activeR
       } catch {
         continue;
       }
-      if (now - st.mtimeMs > ttlMs) {
+      const limit = name.startsWith(STAGED_PREFIX) ? stagedTtlMs : ttlMs;
+      if (now - st.mtimeMs > limit) {
         fs.rmSync(p, { recursive: true, force: true });
         removed++;
       }

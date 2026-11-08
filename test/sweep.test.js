@@ -8,6 +8,7 @@ import { removeRunDir } from '../src/files.js';
 import { tmpDir, rmDir } from './helpers.js';
 
 const HOUR = 3600 * 1000;
+const MIN = 60 * 1000;
 
 function mkRun(dataDir, user, name, ageHours, now) {
   const p = ensureUserDirs(dataDir, user);
@@ -33,6 +34,51 @@ test('sweep removes run and staging dirs older than the TTL, keeps fresh ones', 
     assert.equal(fs.existsSync(oldStage), false);
     assert.equal(fs.existsSync(bobOld), false);
     assert.equal(fs.existsSync(fresh), true);
+  } finally {
+    rmDir(dataDir);
+  }
+});
+
+test('staged photos use the short TTL, run directories keep the long one', () => {
+  const dataDir = tmpDir();
+  try {
+    const now = Date.now();
+    const stgOld = mkRun(dataDir, 'alice', 'stg-' + 'a'.repeat(32), 1.5, now);
+    const stgNew = mkRun(dataDir, 'alice', 'stg-' + 'b'.repeat(32), 0.5, now);
+    const run90 = mkRun(dataDir, 'alice', 'run-ninety01', 1.5, now);
+    const run25h = mkRun(dataDir, 'alice', 'run-old25h01', 25, now);
+    const active = mkRun(dataDir, 'alice', 'run-active01', 100, now);
+    const removed = sweepPhotos({
+      dataDir,
+      userIds: ['alice'],
+      ttlMs: 24 * HOUR,
+      stagedTtlMs: 60 * MIN,
+      now,
+      activeRunIds: new Set(['run-active01']),
+    });
+    assert.equal(removed, 2);
+    assert.equal(fs.existsSync(stgOld), false, 'a 90 minute old staged photo is removed');
+    assert.equal(fs.existsSync(stgNew), true);
+    assert.equal(fs.existsSync(run90), true, 'a 90 minute old run directory is kept');
+    assert.equal(fs.existsSync(run25h), false);
+    assert.equal(fs.existsSync(active), true);
+  } finally {
+    rmDir(dataDir);
+  }
+});
+
+test('the staged TTL defaults to 60 minutes and custom values are honoured', () => {
+  const dataDir = tmpDir();
+  try {
+    const now = Date.now();
+    const a = mkRun(dataDir, 'alice', 'stg-' + 'c'.repeat(32), 0.75, now);
+    sweepPhotos({ dataDir, userIds: ['alice'], ttlMs: 24 * HOUR, now });
+    assert.equal(fs.existsSync(a), true, 'default is 60 minutes');
+    sweepPhotos({ dataDir, userIds: ['alice'], ttlMs: 24 * HOUR, stagedTtlMs: 30 * MIN, now });
+    assert.equal(fs.existsSync(a), false, '30 minutes removes it');
+    const r = mkRun(dataDir, 'alice', 'run-custom001', 3, now);
+    sweepPhotos({ dataDir, userIds: ['alice'], ttlMs: 2 * HOUR, stagedTtlMs: 5 * MIN, now });
+    assert.equal(fs.existsSync(r), false, 'a custom run TTL is honoured');
   } finally {
     rmDir(dataDir);
   }

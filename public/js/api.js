@@ -50,6 +50,9 @@ export const api = {
   uploadPhoto: (file) =>
     fetch('/api/photos', { method: 'POST', credentials: 'same-origin', body: file }).then(json),
   deletePhoto: (id) => fetch(`/api/photos/${id}`, opts('DELETE')).then(json),
+  // Best effort for page exit: keepalive lets the request outlive the page; the result is ignored.
+  deletePhotoOnExit: (id) =>
+    fetch(`/api/photos/${id}`, { ...opts('DELETE'), keepalive: true }).catch(() => {}),
   // Streams a reply: calls onEvent({event, data}) for start, delta, tool, done and error.
   async stream(path, body, onEvent) {
     const res = await fetch(path, opts('POST', body));
