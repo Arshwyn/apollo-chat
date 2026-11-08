@@ -2,6 +2,7 @@ import { api, ApiError } from './api.js';
 import { messageEl, renderBody } from './render.js';
 import { conversationToText, copyText } from './copy.js';
 import { createDrawer } from './drawer.js';
+import { createStagedPhotos } from './staged.js';
 
 const MAX_PHOTOS = 4;
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -30,7 +31,8 @@ const drawer = createDrawer({
   background: ['bar', 'offline', 'messages', 'status', 'composer'].map($),
 });
 
-const state = { conv: null, convs: [], busy: false, photos: [], oldest: null, poll: null };
+const staged = createStagedPhotos({ api });
+const state = { conv: null, convs: [], busy: false, oldest: null, poll: null };
 
 function note(text, cls = '') {
   const n = document.createElement('div');
@@ -285,15 +287,13 @@ async function run(startStream) {
 
 async function send() {
   const text = els.input.value.trim();
-  const ready = state.photos.filter((p) => p.id);
-  if ((!text && ready.length === 0) || state.busy || state.photos.some((p) => !p.id)) return;
+  if ((!text && staged.ready().length === 0) || state.busy || staged.hasPending()) return;
   els.input.value = '';
   autosize();
-  const ids = ready.map((p) => p.id);
+  for (const p of staged.entries()) URL.revokeObjectURL(p.url);
+  const ids = staged.takeForSend();
   const shown = { id: 'tmp', role: 'user', text, photoCount: ids.length };
   els.messages.append(messageEl(shown, copyWithFeedback));
-  for (const p of state.photos) URL.revokeObjectURL(p.url);
-  state.photos = [];
   els.previews.replaceChildren();
   toBottom();
   await run((onEvent) => api.send(state.conv.id, text, ids, onEvent));
@@ -324,7 +324,9 @@ function closeIcon() {
   return svg;
 }
 
-function addPreview(photo, file) {
+function addPreview(file) {
+  const url = URL.createObjectURL(file);
+  const { entry: photo, settled } = staged.add(file, { url });
   const wrap = document.createElement('div');
   wrap.className = 'preview uploading';
   const img = document.createElement('img');
@@ -335,39 +337,40 @@ function addPreview(photo, file) {
   x.append(closeIcon());
   x.setAttribute('aria-label', 'Remove photo');
   x.addEventListener('click', () => {
-    state.photos = state.photos.filter((p) => p !== photo);
+    staged.remove(photo);
     URL.revokeObjectURL(photo.url);
     wrap.remove();
-    if (photo.id) api.deletePhoto(photo.id).catch(() => {});
   });
   wrap.append(img, x);
   els.previews.append(wrap);
-  api
-    .uploadPhoto(file)
-    .then((r) => {
-      photo.id = r.photoId;
-      wrap.classList.remove('uploading');
-    })
-    .catch((e) => {
-      state.photos = state.photos.filter((p) => p !== photo);
+  settled.then((status) => {
+    if (status === 'ready') wrap.classList.remove('uploading');
+    else if (status === 'failed') {
+      URL.revokeObjectURL(photo.url);
       wrap.remove();
+      const e = photo.error;
       note(e instanceof ApiError && e.status === 415 ? e.message : 'Could not upload that photo.', 'err');
-    });
+    }
+  });
 }
 
 els.attach.addEventListener('click', () => els.file.click());
 els.file.addEventListener('change', () => {
   for (const file of els.file.files) {
-    if (state.photos.length >= MAX_PHOTOS) return note(`At most ${MAX_PHOTOS} photos per message.`, 'err');
+    if (staged.count() >= MAX_PHOTOS) return note(`At most ${MAX_PHOTOS} photos per message.`, 'err');
     if (file.size > MAX_BYTES) {
       note('That photo is larger than 10 MB.', 'err');
       continue;
     }
-    const photo = { id: null, url: URL.createObjectURL(file) };
-    state.photos.push(photo);
-    addPreview(photo, file);
+    addPreview(file);
   }
   els.file.value = '';
+});
+// Unsent photos are deleted when the page goes away. A page kept for back/forward restore keeps its chips,
+// and hiding the page (switching to the camera or gallery to pick a photo) must not drop them either, so
+// only a real exit counts.
+window.addEventListener('pagehide', (e) => {
+  if (!e.persisted) staged.discardAll(api.deletePhotoOnExit);
 });
 els.form.addEventListener('submit', (e) => {
   e.preventDefault();

@@ -117,3 +117,50 @@ test('an unsent photo can be removed by its owner only', async () => {
     await t.close();
   }
 });
+
+test('removing a photo leaves other users and other photos alone, and odd ids are rejected', async () => {
+  const t = await withPhotos();
+  try {
+    const a1 = (await t.call('alice', 'POST', '/api/photos', await jpeg())).json.photoId;
+    const a2 = (await t.call('alice', 'POST', '/api/photos', await jpeg(80))).json.photoId;
+    const b1 = (await t.call('bob', 'POST', '/api/photos', await jpeg())).json.photoId;
+    const aliceTmp = path.join(t.dataDir, 'users', 'alice', 'tmp');
+    assert.equal((await t.call('bob', 'DELETE', `/api/photos/${a1}`)).status, 400);
+    assert.equal(files(aliceTmp).filter((f) => f.endsWith('.jpg')).length, 2, 'owner files untouched');
+    for (const bad of ['..%2f', '%2e%2e%2f', 'a'.repeat(31), 'A'.repeat(32), `${a1}%2f..`, `..%2f${b1}`]) {
+      assert.equal((await t.call('alice', 'DELETE', `/api/photos/${bad}`)).status, 400, bad);
+    }
+    assert.equal((await t.call('alice', 'DELETE', `/api/photos/${a1}`)).status, 200);
+    assert.deepEqual(
+      files(aliceTmp).filter((f) => f.endsWith('.jpg')),
+      [`stg-${a2}/${a2}.jpg`],
+    );
+    assert.equal(
+      files(path.join(t.dataDir, 'users', 'bob', 'tmp')).filter((f) => f.endsWith('.jpg')).length,
+      1,
+    );
+  } finally {
+    await t.close();
+  }
+});
+
+test('a staged directory that is a symlink out of the user tree is never followed', async () => {
+  const t = await withPhotos();
+  try {
+    const outside = path.join(t.dataDir, 'outside');
+    fs.mkdirSync(outside);
+    fs.writeFileSync(path.join(outside, 'keep.jpg'), 'x');
+    const id = 'd'.repeat(32);
+    const tmp = path.join(t.dataDir, 'users', 'alice', 'tmp');
+    fs.mkdirSync(tmp, { recursive: true });
+    fs.symlinkSync(outside, path.join(tmp, `stg-${id}`));
+    assert.equal((await t.call('alice', 'DELETE', `/api/photos/${id}`)).status, 400);
+    assert.equal(fs.existsSync(path.join(outside, 'keep.jpg')), true, 'the target is untouched');
+    assert.throws(() =>
+      claimPhotos({ dataDir: t.dataDir, user: 'alice', runId: 'run-symlink01', photoIds: [id] }),
+    );
+    assert.equal(fs.existsSync(path.join(outside, 'keep.jpg')), true, 'claiming does not move it either');
+  } finally {
+    await t.close();
+  }
+});

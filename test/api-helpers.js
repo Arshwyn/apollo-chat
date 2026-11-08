@@ -15,6 +15,7 @@ export function testConfig(dataDir, extra = {}) {
     maxRuns: 2,
     rateLimitPerHour: 30,
     photoTtlHours: 24,
+    stagedPhotoTtlMinutes: 60,
     replayTurns: 20,
     runTimeoutMs: 5000,
     stripTrailerLines: true,

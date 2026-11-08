@@ -42,10 +42,21 @@ export async function stagePhoto({ dataDir, user, buffer }) {
   return id;
 }
 
+// The staged directory of one of the caller's own photos. The id must be 32 lowercase hex characters, the
+// directory must be a real directory (not a link) directly inside the caller's tmp folder, and its resolved
+// path must still be there. Anything else is the same 400 as an unknown id.
 function stagedFile(dataDir, user, id) {
   if (typeof id !== 'string' || !PHOTO_ID.test(id)) throw new HttpError(400, 'unknown photo');
-  const dir = path.join(userPaths(dataDir, user).tmp, `stg-${id}`);
-  if (!fs.existsSync(dir)) throw new HttpError(400, 'unknown photo');
+  const tmp = userPaths(dataDir, user).tmp;
+  const dir = path.join(tmp, `stg-${id}`);
+  let st;
+  try {
+    st = fs.lstatSync(dir);
+    if (!st.isDirectory() || path.dirname(fs.realpathSync(dir)) !== fs.realpathSync(tmp))
+      throw new Error('not confined');
+  } catch {
+    throw new HttpError(400, 'unknown photo');
+  }
   const name = fs.readdirSync(dir)[0];
   if (!name) throw new HttpError(400, 'unknown photo');
   return { dir, file: path.join(dir, name), name };
@@ -87,7 +98,8 @@ export function photoRoutes({ config }) {
       'DELETE',
       '/api/photos/:id',
       ({ user, params }) => {
-        // Drops an unsent photo the user removed before sending; unknown ids are a no-op 404.
+        // Drops an unsent photo the user removed before sending. An id that is unknown, belongs to another user
+        // or is malformed is a 400 with nothing removed.
         const s = stagedFile(config.dataDir, user, params.id);
         fs.rmSync(s.dir, { recursive: true, force: true });
         return { ok: true };

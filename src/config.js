@@ -74,6 +74,7 @@ export function loadConfig(env = process.env, { appDir = APP_DIR } = {}) {
     maxRuns: int(env, 'MAX_RUNS', 2),
     rateLimitPerHour: int(env, 'RATE_LIMIT_PER_HOUR', 30),
     photoTtlHours: int(env, 'PHOTO_TTL_HOURS', 24),
+    stagedPhotoTtlMinutes: int(env, 'STAGED_PHOTO_TTL_MINUTES', 60),
     replayTurns: int(env, 'REPLAY_TURNS', 20, { max: 100 }),
     stripTrailerLines: env.STRIP_TRAILER_LINES !== '0',
     triggerPhrases: (

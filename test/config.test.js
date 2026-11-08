@@ -17,6 +17,15 @@ test('loads a valid configuration with defaults', () => {
   assert.equal(c.tzName, 'UTC');
   assert.deepEqual(c.userIds, ['alice', 'bob']);
   assert.equal(c.users.get('a@example.com'), 'alice');
+  assert.equal(c.photoTtlHours, 24);
+  assert.equal(c.stagedPhotoTtlMinutes, 60);
+});
+
+test('STAGED_PHOTO_TTL_MINUTES is validated like the other integers', () => {
+  assert.equal(loadConfig({ ...base, STAGED_PHOTO_TTL_MINUTES: '15' }).stagedPhotoTtlMinutes, 15);
+  assert.equal(loadConfig({ ...base, STAGED_PHOTO_TTL_MINUTES: '' }).stagedPhotoTtlMinutes, 60);
+  for (const bad of ['0', '-5', '1.5', 'soon'])
+    assert.throws(() => loadConfig({ ...base, STAGED_PHOTO_TTL_MINUTES: bad }), ConfigError, bad);
 });
 
 test('refuses a DATA_DIR that is relative or inside the app directory', () => {

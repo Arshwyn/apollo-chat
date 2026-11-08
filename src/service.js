@@ -30,6 +30,7 @@ export function buildService({ config, authenticate, gateway, logger, now }) {
         dataDir: config.dataDir,
         userIds: config.userIds,
         ttlMs: config.photoTtlHours * 3600 * 1000,
+        stagedTtlMs: config.stagedPhotoTtlMinutes * 60 * 1000,
         activeRunIds: runs.activeRunIds(),
       }),
   });
