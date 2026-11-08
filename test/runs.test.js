@@ -348,6 +348,78 @@ test('retries count toward the hourly limit and rejected retries do not', async 
   }
 });
 
+test('a run that throws outside the gateway attempt still finalises once', async () => {
+  const t = setup(async (req, { onLine }) => (onLine(delta('fine')), onLine(result('fine')), ok()));
+  try {
+    const store = t.stores.forUser('alice');
+    const c = store.createConversation();
+    const real = store.recentTurns.bind(store);
+    store.recentTurns = () => {
+      throw new Error('SECRET-PATH boom');
+    };
+    const h = t.runs.start({ user: 'alice', conversationId: c.id, text: 'hello' });
+    const seen = collect(h);
+    let ends = 0;
+    h.events.on('end', () => ends++);
+    await h.done;
+    assert.deepEqual(
+      seen.map((s) => s[0]),
+      ['error'],
+    );
+    assert.equal(seen[0][1].message, 'Apollo could not complete this reply.');
+    assert.equal(ends, 1);
+    assert.equal(store.lastMessage(c.id).status, 'error');
+    assert.equal(t.runs.isBusy('alice'), false);
+    assert.ok(t.logs.some((l) => l.includes('run_crashed')));
+    assert.ok(!t.logs.join('').includes('SECRET-PATH'));
+    store.recentTurns = real;
+    const h2 = t.runs.start({ user: 'alice', conversationId: c.id, text: 'again' });
+    await h2.done;
+    assert.equal(store.lastMessage(c.id).status, 'done');
+  } finally {
+    t.done();
+  }
+});
+
+test('a failing run keeps its photos for Retry, and a throw after the end event does not emit twice', async () => {
+  const t = setup(async (req, { onLine }) => (onLine(delta('fine')), onLine(result('fine')), ok()));
+  try {
+    const store = t.stores.forUser('alice');
+    const c = store.createConversation();
+    const id = await stagePhoto({ dataDir: t.dataDir, user: 'alice', buffer: await jpeg() });
+    const real = store.recentTurns.bind(store);
+    store.recentTurns = () => {
+      throw new Error('boom');
+    };
+    const h = t.runs.start({ user: 'alice', conversationId: c.id, text: 'p', photoIds: [id] });
+    await h.done;
+    const runDirPath = path.join(t.dataDir, 'users', 'alice', 'tmp');
+    assert.equal(fs.readdirSync(runDirPath).length, 1, 'the run directory is kept');
+    store.recentTurns = real;
+    const h2 = t.runs.retry({ user: 'alice', conversationId: c.id });
+    await h2.done;
+    assert.equal(store.lastMessage(c.id).status, 'done');
+
+    // A listener that throws on 'end' (after done was emitted) must not cause a second emission.
+    const h3 = t.runs.start({ user: 'alice', conversationId: c.id, text: 'q' });
+    const seen = collect(h3);
+    let ends = 0;
+    h3.events.on('end', () => {
+      ends++;
+      throw new Error('listener failure');
+    });
+    await h3.done;
+    assert.deepEqual(
+      seen.map((s) => s[0]).filter((n) => n !== 'delta'),
+      ['done'],
+    );
+    assert.equal(ends, 1);
+    assert.equal(store.lastMessage(c.id).status, 'done');
+  } finally {
+    t.done();
+  }
+});
+
 test('the global cap rejects a run beyond MAX_RUNS', async () => {
   let release;
   const gate = new Promise((r) => (release = r));

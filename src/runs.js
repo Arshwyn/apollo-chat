@@ -180,9 +180,43 @@ export class RunManager {
     };
     this.running.set(args.user, state);
     const done = this.#execute(state)
-      .catch(() => {})
+      .catch(() => this.#fail(state))
       .finally(() => this.running.delete(args.user));
     return { userMessage: args.userMessage, assistantMessage: args.assistantMessage, events, done };
+  }
+
+  // Last resort when #execute throws outside the gateway attempt: mark the reply as failed and end the
+  // stream, unless the normal path already did. Photos stay in place so Retry works. The log line
+  // carries no message or error text.
+  #fail(state) {
+    const { user, runId, assistantMessage } = state;
+    try {
+      this.logger.event('run_crashed', { user, run: runId });
+    } catch {
+      /* logging must not stop the cleanup */
+    }
+    let id = assistantMessage.id;
+    if (!state.emitted) {
+      try {
+        id = this.stores.forUser(user).updateMessage(id, { status: 'error' }).id;
+      } catch {
+        /* best effort */
+      }
+      state.emitted = true;
+      this.#emitSafe(state, 'error', { message: 'Apollo could not complete this reply.', message_id: id });
+    }
+    if (!state.ended) {
+      state.ended = true;
+      this.#emitSafe(state, 'end');
+    }
+  }
+
+  #emitSafe(state, name, data) {
+    try {
+      state.events.emit(name, data);
+    } catch {
+      /* a failing listener must not block the rest */
+    }
   }
 
   async #attempt(state, prompt) {
@@ -300,9 +334,11 @@ export class RunManager {
       code: exit?.code ?? null,
       ms: this.now() - started,
     });
+    state.emitted = true;
     if (status === 'error')
       state.events.emit('error', { message: 'Apollo could not complete this reply.', message_id: saved.id });
     else state.events.emit('done', { status, text, message_id: saved.id });
+    state.ended = true;
     state.events.emit('end');
   }
 }

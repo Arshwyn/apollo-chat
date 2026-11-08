@@ -117,3 +117,22 @@ test('end to end: logs hold no message content', async () => {
     await t.close();
   }
 });
+
+test('end to end: a run that throws ends the SSE stream with an error event', async () => {
+  const t = await boot();
+  try {
+    const id = await newConv(t, 'alice');
+    t.svc.stores.forUser('alice').recentTurns = () => {
+      throw new Error('boom');
+    };
+    const ev = await readSse(await send(t, 'alice', id, { text: 'hello' }));
+    assert.deepEqual(
+      ev.map((e) => e[0]),
+      ['start', 'error'],
+    );
+    const msgs = (await (await t.call('alice', 'GET', `/api/conversations/${id}/messages`)).json()).messages;
+    assert.equal(msgs.at(-1).status, 'error');
+  } finally {
+    await t.close();
+  }
+});
