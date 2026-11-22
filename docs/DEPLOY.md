@@ -27,7 +27,8 @@ container (app)  --unix socket (directory bind-mount)-->  host gateway  -->  cla
 7. **Rules text.** Add the short rules.md paragraph given in `docs/HOOK.md` (durable facts from free chat, photo numbers written before replying).
 8. **Retention for Claude Code sessions.** Chat runs write no session transcript (`--no-session-persistence`), but Claude Code transcripts do retain image data from tool results. Set an explicit `cleanupPeriodDays` in the host settings (a short, approved value; it affects all sessions), and make sure orchestrator-run sessions that handled photos are covered by the same retention.
 9. **Cloudflare.** Create the Access application and policy as described in the README, record the audience tag and team domain in the app's `.env`, and route the tunnel or ingress to the app port. Nothing may reach the origin except through Access.
-10. **Monitoring.** Add a check on `GET /healthz` (returns `{"ok":true}`, no content) to the watchdog.
+10. **Embedding (optional).** To show the app inside a private hosting page, set `EMBED_ANCESTOR` in `.env` to that page's origin and rebuild the container. The Access application is unchanged and the person must have signed in to this app at top level first (the Access login page cannot be framed). Leave it empty otherwise.
+11. **Monitoring.** Add a check on `GET /healthz` (returns `{"ok":true}`, no content) to the watchdog.
 
 ## Deploy the app
 

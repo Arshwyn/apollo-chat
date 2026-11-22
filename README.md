@@ -48,6 +48,7 @@ All settings come from the environment (`.env` for the app, a separate env file 
 | `DATA_DIR`                                          | Absolute data directory, outside the repository (the app refuses to start inside it)       |
 | `GATEWAY_SOCKET_DIR`                                | Directory that holds `gateway.sock`                                                        |
 | `APOLLO_MEMORY_ROOT`                                | The agent's memory root as the host sees it (used to name the user's folder in the prompt) |
+| `EMBED_ANCESTOR`                                    | Optional: one https origin allowed to frame the app (default empty: framing refused)       |
 | `TZ_NAME`                                           | Fallback IANA time zone when the browser has sent none (default `UTC`)                     |
 | `RUN_TIMEOUT_MS`, `MAX_RUNS`, `RATE_LIMIT_PER_HOUR` | Run timeout (default 300000), global concurrency (2), messages per user per hour (30)      |
 | `PHOTO_TTL_HOURS`, `REPLAY_TURNS`                   | Failed-run photo retention (24), earlier text turns replayed into each prompt (20)         |
@@ -80,6 +81,12 @@ npm run icons   # regenerate public/icons
 Run locally: `node --env-file=.env src/index.js` (the app needs a reachable gateway socket to answer messages). The test suite uses a fake `claude` script, so no real data or model is involved. The hook tests read `APOLLO_HOOK_PATH`; `npm test` points it at the proposed hook in `docs/host/`, and the host operator re-runs it against the installed hook (see `docs/HOOK.md`).
 
 Node support: the minimum is Node 20 for everything (`engines` in `package.json`). The container image tracks a newer Node (24, pinned by digest), and the host gateway needs only Node 20 because it is dependency-free. `test/nodeSupport.test.js` guards both claims.
+
+## Embedding in a hosting page (optional)
+
+By default the app cannot be framed (`frame-ancestors 'none'`). Setting `EMBED_ANCESTOR` to one https origin (no path, query, credentials or wildcard; anything else stops startup) changes only that directive to that origin, so a private hub page can show the app in an iframe. Nothing else in the CSP loosens, there is no CORS, and the app still authenticates through its own Access session: the framing page passes no identity, token or parameter and cannot read the frame (different origin). The Access login page itself refuses framing, so a frame with a missing or expired session stays blank; the person signs in by opening the app top-level.
+
+When framed and configured, the page sends the parent two content-free messages with `postMessage` to that exact origin (never `*`): `{type:'apollo-ready'}` once the chats loaded, and `{type:'apollo-state', state}` with `state` `idle`, `thinking` or `speaking`. No text, ids, titles or counts, and nothing is read from the parent. `GET /api/me` returns `embedParent` (the same origin) only when the setting is on. Why: a hosting page can then animate a stand-in for the agent and tell a blank frame from a loaded one, without any chat data crossing origins.
 
 ## Cloudflare Access
 
