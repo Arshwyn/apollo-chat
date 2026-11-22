@@ -227,3 +227,38 @@ test('/api/me reports the configured photo limit', async () => {
     await t.close();
   }
 });
+
+test('framing is refused by default and allowed only for the configured origin', async () => {
+  const t = await startApp();
+  try {
+    const r = await t.call('alice', 'GET', '/api/me');
+    assert.match(r.headers.get('content-security-policy'), /frame-ancestors 'none'; base-uri 'none'/);
+    assert.equal(r.json.embedParent, undefined);
+    assert.equal(r.headers.get('x-frame-options'), null);
+  } finally {
+    await t.close();
+  }
+  const e = await startApp({ configExtra: { embedAncestor: 'https://hub.example.com' } });
+  try {
+    for (const path of ['/api/me', '/', '/js/app.js']) {
+      const r = await e.call('alice', 'GET', path);
+      const csp = r.headers.get('content-security-policy');
+      assert.match(csp, /frame-ancestors https:\/\/hub\.example\.com; base-uri 'none'/, path);
+      assert.doesNotMatch(csp, /\*/, path);
+      assert.match(csp, /default-src 'self'/, path);
+      assert.match(csp, /connect-src 'self'/, path);
+    }
+    assert.equal((await e.call('alice', 'GET', '/api/me')).json.embedParent, 'https://hub.example.com');
+  } finally {
+    await e.close();
+  }
+  const again = await startApp();
+  try {
+    assert.match(
+      (await again.call('alice', 'GET', '/api/me')).headers.get('content-security-policy'),
+      /frame-ancestors 'none'/,
+    );
+  } finally {
+    await again.close();
+  }
+});
