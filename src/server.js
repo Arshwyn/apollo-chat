@@ -17,13 +17,22 @@ const MIME = {
   '.woff2': 'font/woff2',
 };
 
+const CSP_BASE = "default-src 'self'; img-src 'self' blob: data:; connect-src 'self'; frame-ancestors";
+const CSP_TAIL = "base-uri 'none'; form-action 'self'";
+const cspFor = (ancestor) => `${CSP_BASE} ${ancestor || "'none'"}; ${CSP_TAIL}`;
+
 export const SECURITY_HEADERS = {
-  'Content-Security-Policy':
-    "default-src 'self'; img-src 'self' blob: data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'",
+  'Content-Security-Policy': cspFor(null),
   'Referrer-Policy': 'no-referrer',
   'X-Content-Type-Options': 'nosniff',
   'Cache-Control': 'no-store',
 };
+
+// Framing is refused unless one exact https origin is configured (EMBED_ANCESTOR): then only that origin may
+// frame the app. The header object is shared, so it is set once per app instance (null restores 'none').
+export function configureFraming(origin) {
+  SECURITY_HEADERS['Content-Security-Policy'] = cspFor(origin);
+}
 
 export function sendJson(res, status, body) {
   const data = JSON.stringify(body);
@@ -61,6 +70,7 @@ export function createApp({
   isBusy = () => false,
   publicDir = PUBLIC_DIR,
 }) {
+  configureFraming(config.embedAncestor || null);
   const table = [...coreRoutes({ config, stores, isBusy }), ...routes].map(([method, template, handler]) => ({
     method,
     template,
@@ -167,6 +177,7 @@ function coreRoutes({ config, stores, isBusy }) {
       ({ user }) => ({
         user,
         limits: { maxPhotos: config.maxPhotosPerMessage, maxPhotoBytes: MAX_IMAGE_BYTES },
+        ...(config.embedAncestor ? { embedParent: config.embedAncestor } : {}),
       }),
     ],
     [
