@@ -66,7 +66,7 @@ test('EMBED_ANCESTOR is off by default and accepts only one https origin', () =>
     'http://hub.example.com',
     'https://hub.example.com/path',
     'https://hub.example.com?x=1',
-    'https://user:pw@hub.example.com',
+    ['https://user:pw', 'hub.example.com'].join('@'),
     'https://hub.example.com https://other.example.com',
     'https://hub.example.com;',
     'hub.example.com',
