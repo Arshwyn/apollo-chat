@@ -46,6 +46,30 @@ export function validateTimeZone(tz) {
   return tz;
 }
 
+// One absolute https origin (no path, query, credentials or wildcard) or nothing. Normalised to the origin.
+export function parseEmbedAncestor(raw) {
+  const v = String(raw || '').trim();
+  if (!v) return null;
+  let u;
+  try {
+    u = new URL(v);
+  } catch {
+    throw new ConfigError('EMBED_ANCESTOR must be an absolute https origin');
+  }
+  if (
+    u.protocol !== 'https:' ||
+    u.username ||
+    u.password ||
+    u.search ||
+    u.hash ||
+    (u.pathname !== '/' && u.pathname !== '') ||
+    v.includes('*') ||
+    /[\s;,']/.test(v)
+  )
+    throw new ConfigError('EMBED_ANCESTOR must be one https origin with no path, query or wildcard');
+  return u.origin;
+}
+
 export function loadConfig(env = process.env, { appDir = APP_DIR } = {}) {
   const dataDir = env.DATA_DIR;
   if (!dataDir || !path.isAbsolute(dataDir)) throw new ConfigError('DATA_DIR must be an absolute path');
@@ -81,6 +105,7 @@ export function loadConfig(env = process.env, { appDir = APP_DIR } = {}) {
     photoTtlHours: int(env, 'PHOTO_TTL_HOURS', 24),
     stagedPhotoTtlMinutes: int(env, 'STAGED_PHOTO_TTL_MINUTES', 60),
     replayTurns: int(env, 'REPLAY_TURNS', 20, { max: 100 }),
+    embedAncestor: parseEmbedAncestor(env.EMBED_ANCESTOR),
     stripTrailerLines: env.STRIP_TRAILER_LINES !== '0',
     triggerPhrases: (
       env.TRIGGER_PHRASES ||

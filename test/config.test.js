@@ -54,3 +54,28 @@ test('MAX_PHOTOS_PER_MESSAGE defaults to 8 and is validated between 1 and 16', (
   for (const bad of ['0', '17', '-1', '2.5', 'many'])
     assert.throws(() => loadConfig({ ...base, MAX_PHOTOS_PER_MESSAGE: bad }), ConfigError, bad);
 });
+
+test('EMBED_ANCESTOR is off by default and accepts only one https origin', () => {
+  assert.equal(loadConfig(base, { appDir: '/srv/app' }).embedAncestor, null);
+  assert.equal(loadConfig({ ...base, EMBED_ANCESTOR: '' }, { appDir: '/srv/app' }).embedAncestor, null);
+  const ok = loadConfig({ ...base, EMBED_ANCESTOR: 'https://hub.example.com/' }, { appDir: '/srv/app' });
+  assert.equal(ok.embedAncestor, 'https://hub.example.com');
+  for (const bad of [
+    '*',
+    'https://*.example.com',
+    'http://hub.example.com',
+    'https://hub.example.com/path',
+    'https://hub.example.com?x=1',
+    'https://user:pw@hub.example.com',
+    'https://hub.example.com https://other.example.com',
+    'https://hub.example.com;',
+    'hub.example.com',
+    "'self'",
+  ]) {
+    assert.throws(
+      () => loadConfig({ ...base, EMBED_ANCESTOR: bad }, { appDir: '/srv/app' }),
+      ConfigError,
+      bad,
+    );
+  }
+});
