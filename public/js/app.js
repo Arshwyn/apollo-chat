@@ -4,9 +4,12 @@ import { conversationToText, copyText } from './copy.js';
 import { createDrawer } from './drawer.js';
 import { createDailyLogs } from './dayfiles.js';
 import { createStagedPhotos } from './staged.js';
+import { createEmbedSignal } from './embed.js';
 
 // Photo limits come from the server (GET /api/me) so there is one place to change them.
 let limits = null;
+// Content-free ready/state signal to an allowed hosting page; inert unless framed and configured.
+let signal = createEmbedSignal(null);
 const $ = (id) => document.getElementById(id);
 const els = {
   title: $('title'),
@@ -129,6 +132,7 @@ function setBusy(busy, label = '') {
   els.status.hidden = !label;
   els.status.textContent = label;
   els.input.placeholder = busy ? 'Apollo is still replying' : 'Message Apollo';
+  signal.state(busy ? 'thinking' : 'idle');
 }
 
 async function loadConversations() {
@@ -281,6 +285,7 @@ function handleStream(b) {
   return ({ event, data }) => {
     const stick = nearBottom();
     if (event === 'delta') {
+      signal.state('speaking');
       b.text += data.text;
       renderBody(b.body, b.text);
       els.status.hidden = true;
@@ -446,13 +451,16 @@ syncOnline();
 
 (async function init() {
   try {
-    limits = (await api.me()).limits;
+    const me = await api.me();
+    limits = me.limits;
+    signal = createEmbedSignal(me.embedParent);
     await loadConversations();
     if (state.convs.length) await openConversation(state.convs[0].id);
     else await newConversation();
   } catch {
     note('Could not load your chats.', 'err');
   }
+  signal.ready();
 })();
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/sw.js').catch(() => {});

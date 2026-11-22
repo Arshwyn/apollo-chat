@@ -1,7 +1,7 @@
 // App-shell service worker. It caches the static shell only. Anything under /api/ (chats, photos) is
 // never read from or written to a cache: health data must not sit in a shared browser cache. That includes the
 // day files under /api/dayfiles (the Daily logs screen).
-const CACHE = 'apollo-shell-v5';
+const CACHE = 'apollo-shell-v6';
 const SHELL = [
   '/',
   '/style.css',
@@ -9,6 +9,7 @@ const SHELL = [
   '/js/api.js',
   '/js/render.js',
   '/js/copy.js',
+  '/js/embed.js',
   '/js/drawer.js',
   '/js/dayfiles.js',
   '/js/staged.js',
